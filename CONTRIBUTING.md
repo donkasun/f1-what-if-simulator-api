@@ -23,7 +23,7 @@ Thank you for your interest in contributing to the F1 What-If Simulator API! Thi
 
 ```bash
 # Clone your fork
-git clone https://github.com/your-username/f1-what-if-simulator-api.git
+git clone https://github.com/donkasun/f1-what-if-simulator-api.git
 cd f1-what-if-simulator-api
 
 # Create virtual environment
