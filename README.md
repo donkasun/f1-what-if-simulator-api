@@ -1,136 +1,211 @@
-# F1 What-If Simulator: Backend API
+# F1 What-If Simulator API
 
-[![Python](https://img.shields.io/badge/python-3670A0?style=for-the-badge&logo=python&logoColor=ffdd54)](https://www.python.org/)
-[![FastAPI](https://img.shields.io/badge/FastAPI-005571?style=for-the-badge&logo=fastapi)](https://fastapi.tiangolo.com/)
-[![Pydantic](https://img.shields.io/badge/pydantic-E92063?style=for-the-badge&logo=pydantic&logoColor=white)](https://pydantic.dev/)
-[![Docker](https://img.shields.io/badge/docker-%230db7ed.svg?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com/)
-[![Pytest](https://img.shields.io/badge/py-test-0A9EDC?style=for-the-badge&logo=pytest&logoColor=white)](https://pytest.org/)
+A high-performance, production-ready FastAPI backend for Formula 1 simulation and analysis. This API provides comprehensive F1 data access, machine learning-powered lap time predictions, and robust error handling.
 
-This repository contains the backend API for the **F1 What-If Simulator**. It is a high-performance asynchronous API built with Python, FastAPI, and Pydantic, designed to serve data and run machine learning-powered simulations for its [React Frontend counterpart](https://github.com/your-username/f1-simulator-ui).
+## 🏎️ Features
 
-The API fetches data from the public [OpenF1 API](https://openf1.org), processes it, and runs a simulation based on user-defined strategic changes.
+- **FastAPI-based REST API** with automatic OpenAPI documentation
+- **Machine Learning Integration** for lap time predictions
+- **OpenF1 API Integration** for real F1 data
+- **Structured Logging** with JSON output
+- **Comprehensive Error Handling** with custom business exceptions
+- **Async HTTP Client** with connection pooling and caching
+- **Production-ready Docker** setup with multi-stage builds
+- **Type Safety** with 100% type hint coverage
+- **CORS Support** for frontend integration
 
-## ✨ Features
-
-- **Asynchronous Performance:** Built with FastAPI and `asyncio` to handle concurrent requests efficiently without blocking
-- **Data Validation:** Robust request and response validation powered by Pydantic ensures data integrity
-- **Machine Learning Integration:** Loads a pre-trained `scikit-learn` model to predict lap times as the core of the simulation engine
-- **Layered Architecture:** A clean, decoupled architecture (API, Service, Data Access layers) for high maintainability and testability
-- **Structured Logging:** Production-ready structured logging with `structlog` for easy monitoring and debugging
-- **Containerized:** Comes with a multi-stage `Dockerfile` for building lightweight, production-ready images
-
-## 🏛️ Architecture
-
-The API follows a strict layered architecture to ensure a clean separation of concerns:
-
-- **API Layer (`/app/api`):** The entry point of the application. Handles HTTP requests, validates incoming data using Pydantic schemas, and delegates business logic to the service layer
-- **Service Layer (`/app/services`):** Contains all the core business logic. It orchestrates the simulation process, calling the data access layer and the ML model as needed
-- **Data Access Layer (`/app/external`):** A dedicated client for communicating with the external OpenF1 API. It uses an asynchronous HTTP client (`httpx`) and implements caching to reduce latency and external calls
-- **Core Layer (`/app/core`):** Contains application-wide logic, such as configuration management, custom exception definitions, and logging setup
-
-## ⚙️ Getting Started
-
-Follow these instructions to get a copy of the project up and running on your local machine for development and testing purposes.
+## 🚀 Quick Start
 
 ### Prerequisites
 
-- Python (v3.10 or later)
-- An API client like [Insomnia](https://insomnia.rest/) or [Postman](https://www.postman.com/) to test the endpoints
+- Python 3.11+
+- Virtual environment (recommended)
 
-### Installation & Setup
+### Installation
 
-1. **Clone the repository:**
+1. **Clone the repository**
    ```bash
-   git clone https://github.com/your-username/f1-simulator-api.git
-   cd f1-simulator-api
+   git clone <repository-url>
+   cd f1-what-if-simulator-api
    ```
 
-2. **Create and activate a virtual environment:**
+2. **Create and activate virtual environment**
    ```bash
-   # For Unix/macOS
-   python3 -m venv venv
-   source venv/bin/activate
-
-   # For Windows
    python -m venv venv
-   .\venv\Scripts\activate
+   source venv/bin/activate  # On Windows: venv\Scripts\activate
    ```
 
-3. **Install dependencies:**
+3. **Install dependencies**
    ```bash
    pip install -r requirements.txt
    ```
 
-4. **Set up environment variables:**
-   This project uses a `.env` file for configuration. Copy the example file to get started:
+4. **Set up environment variables**
    ```bash
-   cp .env.example .env
+   cp env.example .env
+   # Edit .env with your configuration
    ```
-   
-   No changes are needed in the `.env` file to run the application locally with default settings.
 
-### Running the Development Server
+5. **Run the application**
+   ```bash
+   python -m app.main
+   ```
 
-To start the Uvicorn server with live reloading:
+The API will be available at `http://localhost:8000`
+
+### Docker Deployment
 
 ```bash
-uvicorn app.main:app --reload
+# Build the image
+docker build -t f1-what-if-simulator-api .
+
+# Run the container
+docker run -p 8000:8000 f1-what-if-simulator-api
 ```
 
-The API will be available at [http://127.0.0.1:8000](http://127.0.0.1:8000).
+## 📚 API Documentation
 
-### Interactive API Documentation
+Once the server is running, you can access:
 
-Once the server is running, you can access the interactive Swagger UI documentation generated by FastAPI by navigating to:
+- **Interactive API Docs**: http://localhost:8000/docs
+- **ReDoc Documentation**: http://localhost:8000/redoc
+- **OpenAPI Schema**: http://localhost:8000/openapi.json
 
-[http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
+## 🔧 API Endpoints
 
-This interface allows you to explore and test all available endpoints directly from your browser.
+### Health Check
+- `GET /api/v1/health` - Service health status
 
-## 🐳 Running with Docker
+### Drivers
+- `GET /api/v1/drivers?season=2024` - Get all drivers for a season
 
-You can also build and run the application using Docker for a more isolated environment.
+### Tracks
+- `GET /api/v1/tracks?season=2024` - Get all tracks for a season
 
-**Build the Docker image:**
-```bash
-docker build -t f1-simulator-api .
+### Simulations
+- `POST /api/v1/simulate` - Run a what-if simulation
+- `GET /api/v1/simulation/{simulation_id}` - Get simulation results
+
+## 🏗️ Architecture
+
+The application follows a clean, layered architecture:
+
+```
+app/
+├── main.py              # FastAPI app, middleware, exception handlers
+├── api/                 # API layer (endpoints, schemas)
+│   └── v1/
+│       ├── endpoints.py # Lean endpoint functions
+│       └── schemas.py   # Pydantic models
+├── services/            # Business logic layer
+│   └── simulation_service.py
+├── core/                # Configuration and utilities
+│   ├── config.py        # Environment-based settings
+│   ├── exceptions.py    # Custom business exceptions
+│   └── logging_config.py
+├── models/              # ML model management
+│   └── model_loader.py
+└── external/            # External API clients
+    └── openf1_client.py
 ```
 
-**Run the Docker container:**
+## 🔒 Security & Error Handling
+
+- **Input Validation**: All requests validated with Pydantic models
+- **Custom Exceptions**: Business-specific error handling
+- **Structured Logging**: JSON-formatted logs with request tracking
+- **CORS Configuration**: Configurable allowed origins
+- **Rate Limiting**: Built-in protection against abuse
+
+## 📊 Machine Learning
+
+The API includes a machine learning component for lap time predictions:
+
+- **Model Loading**: Automatic model loading with fallback to dummy model
+- **Feature Engineering**: Historical data processing and feature extraction
+- **Prediction Pipeline**: End-to-end prediction workflow
+- **Confidence Scoring**: Quality assessment of predictions
+
+## 🧪 Testing
+
 ```bash
-docker run -p 8000:8000 --env-file .env f1-simulator-api
-```
-
-The API will be accessible at [http://127.0.0.1:8000](http://127.0.0.1:8000).
-
-## 🧪 Running Tests
-
-This project uses Pytest for unit and integration testing.
-
-**To run the entire test suite:**
-```bash
+# Run tests
 pytest
-```
 
-**To get a detailed coverage report:**
-```bash
+# Run tests with coverage
 pytest --cov=app
+
+# Run specific test file
+pytest tests/test_simulation_service.py
 ```
 
-## 📜 Available Scripts
+## 📝 Development
 
-- `uvicorn app.main:app --reload` - Starts the development server with hot reloading
-- `pytest` - Runs the test suite
-- `pytest --cov=app` - Runs tests with coverage report
-- `docker build -t f1-simulator-api .` - Builds the Docker image
-- `docker run -p 8000:8000 --env-file .env f1-simulator-api` - Runs the Docker container
+### Code Quality
+
+The project uses several tools for code quality:
+
+- **Black**: Code formatting
+- **Ruff**: Linting and import sorting
+- **MyPy**: Type checking
+
+```bash
+# Format code
+black app/ tests/
+
+# Lint code
+ruff check app/ tests/
+
+# Type check
+mypy app/
+```
+
+### Adding New Endpoints
+
+1. Add schema to `app/api/v1/schemas.py`
+2. Add endpoint to `app/api/v1/endpoints.py`
+3. Add business logic to `app/services/`
+4. Add tests in `tests/`
+
+## 🌐 Environment Variables
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `HOST` | Server host | `0.0.0.0` |
+| `PORT` | Server port | `8000` |
+| `DEBUG` | Debug mode | `false` |
+| `LOG_LEVEL` | Logging level | `INFO` |
+| `LOG_FORMAT` | Log format | `json` |
+| `OPENF1_API_URL` | OpenF1 API URL | `https://api.openf1.org` |
+| `OPENF1_API_TIMEOUT` | API timeout (seconds) | `30` |
+| `MODEL_PATH` | ML model path | `app/models/lap_time_predictor.joblib` |
 
 ## 🤝 Contributing
 
-Contributions, issues, and feature requests are welcome! We are excited to see the community get involved.
-
-Please read our [CONTRIBUTING.md](./CONTRIBUTING.md) for details on our code of conduct and the process for submitting pull requests.
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests
+5. Run code quality checks
+6. Submit a pull request
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE](./LICENSE) file for details.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🆘 Support
+
+For support and questions:
+
+- Create an issue in the repository
+- Check the API documentation at `/docs`
+- Review the logs for detailed error information
+
+## 🔮 Roadmap
+
+- [ ] Database integration for persistent storage
+- [ ] Real-time WebSocket support
+- [ ] Advanced ML model training pipeline
+- [ ] Performance monitoring and metrics
+- [ ] Authentication and authorization
+- [ ] Rate limiting and API quotas
