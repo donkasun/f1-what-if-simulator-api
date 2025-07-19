@@ -46,32 +46,50 @@ class SimulationService:
             
         Returns:
             List of driver information
-            
-        Raises:
-            OpenF1APIError: If external API call fails
         """
-        logger.info("Fetching drivers from external API", season=season)
+        logger.info("Fetching mock drivers for season", season=season)
         
-        try:
-            drivers_data = await self.openf1_client.get_drivers(season)
-            
-            drivers = []
-            for driver_data in drivers_data:
-                driver = DriverResponse(
-                    driver_id=driver_data["driver_id"],
-                    name=driver_data["name"],
-                    code=driver_data["code"],
-                    team=driver_data["team"],
-                    nationality=driver_data["nationality"]
-                )
-                drivers.append(driver)
-            
-            logger.info("Successfully fetched drivers", season=season, count=len(drivers))
-            return drivers
-            
-        except Exception as e:
-            logger.error("Failed to fetch drivers", season=season, error=str(e), exc_info=True)
-            raise OpenF1APIError(f"Failed to fetch drivers for season {season}", 500)
+        # Mock driver data for development
+        mock_drivers = [
+            DriverResponse(
+                driver_id=1,
+                name="Max Verstappen",
+                code="VER",
+                team="Red Bull Racing",
+                nationality="Dutch"
+            ),
+            DriverResponse(
+                driver_id=2,
+                name="Lewis Hamilton",
+                code="HAM",
+                team="Mercedes",
+                nationality="British"
+            ),
+            DriverResponse(
+                driver_id=3,
+                name="Charles Leclerc",
+                code="LEC",
+                team="Ferrari",
+                nationality="Monegasque"
+            ),
+            DriverResponse(
+                driver_id=4,
+                name="Lando Norris",
+                code="NOR",
+                team="McLaren",
+                nationality="British"
+            ),
+            DriverResponse(
+                driver_id=5,
+                name="Carlos Sainz",
+                code="SAI",
+                team="Ferrari",
+                nationality="Spanish"
+            )
+        ]
+        
+        logger.info("Successfully fetched mock drivers", season=season, count=len(mock_drivers))
+        return mock_drivers
     
     @alru_cache(maxsize=50)
     async def get_tracks(self, season: int) -> List[TrackResponse]:
@@ -83,32 +101,50 @@ class SimulationService:
             
         Returns:
             List of track information
-            
-        Raises:
-            OpenF1APIError: If external API call fails
         """
-        logger.info("Fetching tracks from external API", season=season)
+        logger.info("Fetching mock tracks for season", season=season)
         
-        try:
-            tracks_data = await self.openf1_client.get_tracks(season)
-            
-            tracks = []
-            for track_data in tracks_data:
-                track = TrackResponse(
-                    track_id=track_data["track_id"],
-                    name=track_data["name"],
-                    country=track_data["country"],
-                    circuit_length=track_data["circuit_length"],
-                    number_of_laps=track_data["number_of_laps"]
-                )
-                tracks.append(track)
-            
-            logger.info("Successfully fetched tracks", season=season, count=len(tracks))
-            return tracks
-            
-        except Exception as e:
-            logger.error("Failed to fetch tracks", season=season, error=str(e), exc_info=True)
-            raise OpenF1APIError(f"Failed to fetch tracks for season {season}", 500)
+        # Mock track data for development
+        mock_tracks = [
+            TrackResponse(
+                track_id=1,
+                name="Monaco Grand Prix",
+                country="Monaco",
+                circuit_length=3.337,
+                number_of_laps=78
+            ),
+            TrackResponse(
+                track_id=2,
+                name="Silverstone Circuit",
+                country="United Kingdom",
+                circuit_length=5.891,
+                number_of_laps=52
+            ),
+            TrackResponse(
+                track_id=3,
+                name="Spa-Francorchamps",
+                country="Belgium",
+                circuit_length=7.004,
+                number_of_laps=44
+            ),
+            TrackResponse(
+                track_id=4,
+                name="Monza",
+                country="Italy",
+                circuit_length=5.793,
+                number_of_laps=53
+            ),
+            TrackResponse(
+                track_id=5,
+                name="Suzuka",
+                country="Japan",
+                circuit_length=5.807,
+                number_of_laps=53
+            )
+        ]
+        
+        logger.info("Successfully fetched mock tracks", season=season, count=len(mock_tracks))
+        return mock_tracks
     
     async def run_simulation(self, request: SimulationRequest) -> SimulationResponse:
         """
@@ -148,8 +184,8 @@ class SimulationService:
             if not track_exists:
                 raise InvalidSimulationParametersError(f"Track with ID {request.track_id} not found")
             
-            # Get historical data for the driver and track
-            historical_data = await self.openf1_client.get_historical_data(
+            # Get mock historical data for the driver and track
+            historical_data = self._get_mock_historical_data(
                 driver_id=request.driver_id,
                 track_id=request.track_id,
                 season=request.season
@@ -269,4 +305,34 @@ class SimulationService:
         elif data_points >= 5:
             return 0.60
         else:
-            return 0.40 
+            return 0.40
+    
+    def _get_mock_historical_data(self, driver_id: int, track_id: int, season: int) -> dict:
+        """
+        Get mock historical data for development purposes.
+        
+        Args:
+            driver_id: Driver identifier
+            track_id: Track identifier
+            season: F1 season year
+            
+        Returns:
+            Mock historical performance data
+        """
+        # Generate realistic mock data based on driver and track
+        base_lap_time = 75.0 + (driver_id * 0.5) + (track_id * 1.2)
+        
+        return {
+            "avg_lap_time": base_lap_time,
+            "best_lap_time": base_lap_time - 2.0,
+            "consistency_score": 0.85 + (driver_id * 0.02),
+            "data_points": 25 + (driver_id * 5),
+            "last_race_position": max(1, driver_id),
+            "qualifying_position": max(1, driver_id),
+            "weather_conditions": ["dry", "wet", "intermediate"],
+            "tire_usage": {
+                "soft": 0.3,
+                "medium": 0.4,
+                "hard": 0.3
+            }
+        } 

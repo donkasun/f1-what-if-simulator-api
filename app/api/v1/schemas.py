@@ -5,7 +5,7 @@ Pydantic schemas for API request/response validation.
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 
 
 class DriverResponse(BaseModel):
@@ -17,8 +17,8 @@ class DriverResponse(BaseModel):
     team: str = Field(..., description="Driver's team name")
     nationality: str = Field(..., description="Driver's nationality")
     
-    class Config:
-        schema_extra = {
+    model_config = {
+        "json_schema_extra": {
             "example": {
                 "driver_id": 1,
                 "name": "Max Verstappen",
@@ -27,6 +27,7 @@ class DriverResponse(BaseModel):
                 "nationality": "Dutch"
             }
         }
+    }
 
 
 class TrackResponse(BaseModel):
@@ -38,8 +39,8 @@ class TrackResponse(BaseModel):
     circuit_length: float = Field(..., description="Track length in kilometers")
     number_of_laps: int = Field(..., description="Number of laps in the race")
     
-    class Config:
-        schema_extra = {
+    model_config = {
+        "json_schema_extra": {
             "example": {
                 "track_id": 1,
                 "name": "Silverstone Circuit",
@@ -48,6 +49,7 @@ class TrackResponse(BaseModel):
                 "number_of_laps": 52
             }
         }
+    }
 
 
 class SimulationRequest(BaseModel):
@@ -59,22 +61,23 @@ class SimulationRequest(BaseModel):
     weather_conditions: Optional[str] = Field(
         default="dry",
         description="Weather conditions (dry, wet, intermediate)",
-        regex="^(dry|wet|intermediate)$"
+        pattern="^(dry|wet|intermediate)$"
     )
     car_setup: Optional[dict] = Field(
         default_factory=dict,
         description="Car setup parameters (optional)"
     )
     
-    @validator('season')
+    @field_validator('season')
+    @classmethod
     def validate_season(cls, v):
         """Validate that the season is reasonable."""
         if v < 1950 or v > 2030:
             raise ValueError('Season must be between 1950 and 2030')
         return v
     
-    class Config:
-        schema_extra = {
+    model_config = {
+        "json_schema_extra": {
             "example": {
                 "driver_id": 1,
                 "track_id": 1,
@@ -86,6 +89,7 @@ class SimulationRequest(BaseModel):
                 }
             }
         }
+    }
 
 
 class SimulationResponse(BaseModel):
@@ -102,8 +106,8 @@ class SimulationResponse(BaseModel):
     created_at: datetime = Field(..., description="Simulation creation timestamp")
     processing_time_ms: int = Field(..., description="Time taken to process simulation in milliseconds")
     
-    class Config:
-        schema_extra = {
+    model_config = {
+        "json_schema_extra": {
             "example": {
                 "simulation_id": "sim_123456789",
                 "driver_id": 1,
@@ -120,6 +124,7 @@ class SimulationResponse(BaseModel):
                 "processing_time_ms": 1250
             }
         }
+    }
 
 
 class ErrorResponse(BaseModel):
@@ -129,11 +134,12 @@ class ErrorResponse(BaseModel):
     code: str = Field(..., description="Error code for programmatic handling")
     timestamp: datetime = Field(default_factory=datetime.utcnow, description="Error timestamp")
     
-    class Config:
-        schema_extra = {
+    model_config = {
+        "json_schema_extra": {
             "example": {
                 "detail": "Driver with ID 999 not found",
                 "code": "DRIVER_NOT_FOUND",
                 "timestamp": "2024-01-15T10:30:00Z"
             }
-        } 
+        }
+    } 

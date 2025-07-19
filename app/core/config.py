@@ -4,7 +4,8 @@ Configuration management for F1 What-If Simulator API.
 
 from typing import List
 
-from pydantic import BaseSettings, Field
+from pydantic_settings import BaseSettings
+from pydantic import Field
 
 
 class Settings(BaseSettings):
@@ -57,10 +58,11 @@ class Settings(BaseSettings):
         description="Header name for API key authentication"
     )
     
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
-        case_sensitive = False
+    model_config = {
+        "env_file": ".env",
+        "env_file_encoding": "utf-8",
+        "case_sensitive": False
+    }
 
 
 # Global settings instance
