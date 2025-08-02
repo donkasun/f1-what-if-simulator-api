@@ -122,6 +122,112 @@ class SimulationResponse(BaseModel):
     }
 
 
+class SessionResponse(BaseModel):
+    """Response schema for session information."""
+
+    session_key: int = Field(..., description="Unique session identifier")
+    meeting_key: int = Field(..., description="Meeting identifier")
+    location: str = Field(..., description="Track location")
+    session_type: str = Field(
+        ..., description="Session type (Practice, Qualifying, Race)"
+    )
+    session_name: str = Field(..., description="Session name")
+    date_start: datetime = Field(..., description="Session start time")
+    date_end: datetime = Field(..., description="Session end time")
+    country_name: str = Field(..., description="Country name")
+    circuit_short_name: str = Field(..., description="Circuit short name")
+    year: int = Field(..., description="Season year")
+
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "session_key": 9472,
+                "meeting_key": 1229,
+                "location": "Sakhir",
+                "session_type": "Race",
+                "session_name": "Race",
+                "date_start": "2024-03-02T15:00:00+00:00",
+                "date_end": "2024-03-02T17:00:00+00:00",
+                "country_name": "Bahrain",
+                "circuit_short_name": "Sakhir",
+                "year": 2024,
+            }
+        }
+    }
+
+
+class WeatherDataResponse(BaseModel):
+    """Response schema for weather data point."""
+
+    date: datetime = Field(..., description="Weather measurement timestamp")
+    session_key: int = Field(..., description="Session identifier")
+    air_temperature: float = Field(..., description="Air temperature in Celsius")
+    track_temperature: float = Field(..., description="Track temperature in Celsius")
+    humidity: float = Field(..., description="Humidity percentage")
+    pressure: float = Field(..., description="Atmospheric pressure in hPa")
+    wind_speed: float = Field(..., description="Wind speed in m/s")
+    wind_direction: int = Field(..., description="Wind direction in degrees")
+    rainfall: float = Field(..., description="Rainfall in mm")
+
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "date": "2024-03-02T14:03:56.523000+00:00",
+                "session_key": 9472,
+                "air_temperature": 18.9,
+                "track_temperature": 26.5,
+                "humidity": 46.0,
+                "pressure": 1017.1,
+                "wind_speed": 0.9,
+                "wind_direction": 162,
+                "rainfall": 0.0,
+            }
+        }
+    }
+
+
+class WeatherSummaryResponse(BaseModel):
+    """Response schema for weather summary."""
+
+    session_key: int = Field(..., description="Session identifier")
+    weather_condition: str = Field(
+        ..., description="Weather condition (dry/wet/unknown)"
+    )
+    avg_air_temperature: Optional[float] = Field(
+        None, description="Average air temperature in Celsius"
+    )
+    avg_track_temperature: Optional[float] = Field(
+        None, description="Average track temperature in Celsius"
+    )
+    avg_humidity: Optional[float] = Field(
+        None, description="Average humidity percentage"
+    )
+    avg_pressure: Optional[float] = Field(
+        None, description="Average atmospheric pressure in hPa"
+    )
+    avg_wind_speed: Optional[float] = Field(
+        None, description="Average wind speed in m/s"
+    )
+    total_rainfall: float = Field(..., description="Total rainfall in mm")
+    data_points: int = Field(..., description="Number of weather data points")
+
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "session_key": 9472,
+                "weather_condition": "dry",
+                "avg_air_temperature": 18.5,
+                "avg_track_temperature": 24.2,
+                "avg_humidity": 48.5,
+                "avg_pressure": 1017.2,
+                "avg_wind_speed": 0.8,
+                "total_rainfall": 0.0,
+                "data_points": 120,
+            }
+        }
+    }
+
+
 class ErrorResponse(BaseModel):
     """Standard error response schema."""
 

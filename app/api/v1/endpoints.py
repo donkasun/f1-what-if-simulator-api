@@ -12,6 +12,9 @@ from app.api.v1.schemas import (
     SimulationRequest,
     SimulationResponse,
     TrackResponse,
+    SessionResponse,
+    WeatherDataResponse,
+    WeatherSummaryResponse,
 )
 from app.core.exceptions import InvalidSimulationParametersError
 from app.services.simulation_service import SimulationService
@@ -156,3 +159,62 @@ async def remove_from_cache(
         return {"message": f"Simulation {simulation_id} removed from cache"}
     else:
         raise HTTPException(status_code=404, detail="Simulation not found in cache")
+
+
+@router.get("/sessions", response_model=List[SessionResponse])
+async def get_sessions(
+    season: int = Query(..., description="F1 season year"),
+    simulation_service: SimulationService = Depends(get_simulation_service),
+) -> List[SessionResponse]:
+    """Get all sessions for a specific season."""
+    logger.info("Fetching sessions", season=season)
+    try:
+        sessions = await simulation_service.get_sessions(season)
+        return sessions
+    except Exception as e:
+        logger.error(
+            "Failed to fetch sessions", season=season, error=str(e), exc_info=True
+        )
+        raise HTTPException(status_code=500, detail="Failed to fetch sessions")
+
+
+@router.get("/weather/{session_key}", response_model=List[WeatherDataResponse])
+async def get_weather_data(
+    session_key: int,
+    simulation_service: SimulationService = Depends(get_simulation_service),
+) -> List[WeatherDataResponse]:
+    """Get weather data for a specific session."""
+    logger.info("Fetching weather data", session_key=session_key)
+    try:
+        weather_data = await simulation_service.get_weather_data(session_key)
+        return weather_data
+    except Exception as e:
+        logger.error(
+            "Failed to fetch weather data",
+            session_key=session_key,
+            error=str(e),
+            exc_info=True,
+        )
+        raise HTTPException(status_code=500, detail="Failed to fetch weather data")
+
+
+@router.get("/weather/{session_key}/summary", response_model=WeatherSummaryResponse)
+async def get_weather_summary(
+    session_key: int,
+    simulation_service: SimulationService = Depends(get_simulation_service),
+) -> WeatherSummaryResponse:
+    """Get weather summary for a specific session."""
+    logger.info("Fetching weather summary", session_key=session_key)
+    try:
+        weather_summary = await simulation_service.get_session_weather_summary(
+            session_key
+        )
+        return weather_summary
+    except Exception as e:
+        logger.error(
+            "Failed to fetch weather summary",
+            session_key=session_key,
+            error=str(e),
+            exc_info=True,
+        )
+        raise HTTPException(status_code=500, detail="Failed to fetch weather summary")
