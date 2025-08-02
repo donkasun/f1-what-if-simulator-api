@@ -21,6 +21,9 @@ from app.api.v1.schemas import (
     SimulationRequest,
     SimulationResponse,
     TrackResponse,
+    SessionResponse,
+    WeatherDataResponse,
+    WeatherSummaryResponse,
 )
 
 logger = structlog.get_logger()
@@ -152,6 +155,78 @@ class SimulationService:
             "Successfully fetched mock tracks", season=season, count=len(mock_tracks)
         )
         return mock_tracks
+
+    async def get_sessions(self, season: int) -> List[SessionResponse]:
+        """Get all sessions for a specific season."""
+        logger.info("Fetching sessions", season=season)
+
+        async with self.openf1_client as client:
+            sessions_data = await client.get_sessions(season)
+
+            sessions = []
+            for session in sessions_data:
+                sessions.append(
+                    SessionResponse(
+                        session_key=session["session_key"],
+                        meeting_key=session["meeting_key"],
+                        location=session["location"],
+                        session_type=session["session_type"],
+                        session_name=session["session_name"],
+                        date_start=session["date_start"],
+                        date_end=session["date_end"],
+                        country_name=session["country_name"],
+                        circuit_short_name=session["circuit_short_name"],
+                        year=session["year"],
+                    )
+                )
+
+            return sessions
+
+    async def get_weather_data(self, session_key: int) -> List[WeatherDataResponse]:
+        """Get weather data for a specific session."""
+        logger.info("Fetching weather data", session_key=session_key)
+
+        async with self.openf1_client as client:
+            weather_data = await client.get_weather_data(session_key)
+
+            weather_responses = []
+            for weather in weather_data:
+                weather_responses.append(
+                    WeatherDataResponse(
+                        date=weather["date"],
+                        session_key=weather["session_key"],
+                        air_temperature=weather["air_temperature"],
+                        track_temperature=weather["track_temperature"],
+                        humidity=weather["humidity"],
+                        pressure=weather["pressure"],
+                        wind_speed=weather["wind_speed"],
+                        wind_direction=weather["wind_direction"],
+                        rainfall=weather["rainfall"],
+                    )
+                )
+
+            return weather_responses
+
+    async def get_session_weather_summary(
+        self, session_key: int
+    ) -> WeatherSummaryResponse:
+        """Get weather summary for a specific session."""
+        logger.info("Fetching weather summary", session_key=session_key)
+
+        async with self.openf1_client as client:
+            weather_summary = await client.get_session_weather_summary(session_key)
+
+            return WeatherSummaryResponse(
+                session_key=weather_summary["session_key"],
+                weather_condition=weather_summary["weather_condition"],
+                avg_air_temperature=weather_summary["avg_air_temperature"],
+                avg_track_temperature=weather_summary["avg_track_temperature"],
+                avg_humidity=weather_summary["avg_humidity"],
+                avg_pressure=weather_summary["avg_pressure"],
+                avg_wind_speed=weather_summary["avg_wind_speed"],
+                total_rainfall=weather_summary["total_rainfall"],
+                data_points=weather_summary["data_points"],
+            )
 
     async def run_simulation(self, request: SimulationRequest) -> SimulationResponse:
         """
