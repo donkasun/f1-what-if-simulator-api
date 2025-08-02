@@ -8,7 +8,7 @@ including ML model integration and result caching.
 import time
 import uuid
 from datetime import datetime, UTC
-from typing import List
+from typing import Any, List
 
 import structlog
 from async_lru import alru_cache
@@ -26,7 +26,7 @@ from app.api.v1.schemas import (
 logger = structlog.get_logger()
 
 # Global cache for simulation results - persists across service instances
-_simulation_cache = {}
+_simulation_cache: dict[str, Any] = {}
 
 
 class SimulationService:
@@ -218,8 +218,8 @@ class SimulationService:
                 season=request.season,
                 predicted_lap_time=float(predicted_lap_time),
                 confidence_score=confidence_score,
-                weather_conditions=request.weather_conditions,
-                car_setup=request.car_setup,
+                weather_conditions=request.weather_conditions or "dry",
+                car_setup=request.car_setup or {},
                 created_at=datetime.now(UTC),
                 processing_time_ms=processing_time_ms,
             )

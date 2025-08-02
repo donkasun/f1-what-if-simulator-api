@@ -5,7 +5,7 @@ ML model loader for F1 What-If Simulator.
 import os
 from typing import Any
 
-import joblib
+import joblib  # type: ignore
 import structlog
 
 from app.core.config import settings
@@ -75,7 +75,7 @@ class ModelLoader:
         Returns:
             Dummy model that returns a fixed prediction
         """
-        from sklearn.ensemble import RandomForestRegressor
+        from sklearn.ensemble import RandomForestRegressor  # type: ignore
         import numpy as np
 
         # Create a simple dummy model

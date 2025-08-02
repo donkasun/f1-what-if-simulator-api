@@ -112,7 +112,7 @@ class OpenF1Client:
 
     async def _make_request(
         self, method: str, endpoint: str, params: Optional[Dict] = None
-    ) -> List[Dict]:
+    ) -> List[Dict]:  # type: ignore
         """
         Make an HTTP request to the OpenF1 API.
 
@@ -140,6 +140,8 @@ class OpenF1Client:
                 params=params,
             )
 
+            if self._client is None:
+                raise OpenF1APIError("HTTP client not initialized")
             response = await self._client.request(method, url, params=params)
             response_time_ms = int((time.time() - start_time) * 1000)
 
