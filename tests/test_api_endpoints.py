@@ -3,8 +3,9 @@ Tests for API endpoints.
 """
 
 import pytest
+import numpy as np
 from fastapi.testclient import TestClient
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, patch, Mock
 from app.main import app
 from app.core.exceptions import InvalidSimulationParametersError
 from app.api.v1.schemas import (
@@ -469,3 +470,160 @@ class TestGridSummaryEndpoint:
         assert response.status_code == 500
         data = response.json()
         assert "Failed to fetch grid summary" in data["detail"]
+
+
+class TestFeatureEngineeringEndpoints:
+    """Test cases for feature engineering endpoints."""
+
+    @patch("app.api.v1.endpoints.SimulationService")
+    def test_process_features_success(self, mock_service_class):
+        """Test successful feature processing."""
+        mock_service = AsyncMock()
+        mock_service_class.return_value = mock_service
+
+        # Mock the feature engineering service
+        mock_feature_service = Mock()
+        mock_service.feature_engineering_service = mock_feature_service
+
+        # Mock the process_session_data method
+        mock_processed_response = Mock()
+        mock_processed_response.processed_data = []
+        mock_processed_response.processing_summary.dict.return_value = {
+            "total_data_points": 100,
+            "total_drivers": 20,
+            "data_quality_score": 0.95,
+        }
+        mock_service.process_session_data.return_value = mock_processed_response
+
+        # Mock the feature engineering methods
+        mock_feature_service.fit_transform_features.return_value = (
+            np.array([[1, 2, 3], [4, 5, 6]]),  # features
+            np.array([85.1, 84.9]),  # targets
+            {"feature_columns": ["col1", "col2", "col3"]},  # metadata
+        )
+        mock_feature_service.get_feature_importance.return_value = {
+            "col1": 0.8,
+            "col2": 0.6,
+            "col3": 0.4,
+        }
+        mock_feature_service.get_data_quality_report.return_value = {
+            "total_records": 100,
+            "data_quality_score": 0.95,
+        }
+
+        request_data = {
+            "session_key": 12345,
+            "include_weather": True,
+            "include_grid": True,
+            "include_lap_times": True,
+            "include_pit_stops": True,
+        }
+
+        response = client.post("/api/v1/feature-engineering/process", json=request_data)
+        assert response.status_code == 200
+        data = response.json()
+
+        assert data["session_key"] == 12345
+        assert data["features_shape"] == [2, 3]
+        assert data["targets_shape"] == [2]
+        assert "feature_metadata" in data
+        assert "feature_importance" in data
+        assert "data_quality_report" in data
+
+    @patch("app.api.v1.endpoints.SimulationService")
+    def test_process_features_service_error(self, mock_service_class):
+        """Test feature processing when service raises an error."""
+        mock_service = AsyncMock()
+        mock_service_class.return_value = mock_service
+        mock_service.process_session_data.side_effect = Exception("Service error")
+
+        request_data = {
+            "session_key": 12345,
+            "include_weather": True,
+            "include_grid": True,
+            "include_lap_times": True,
+            "include_pit_stops": True,
+        }
+
+        response = client.post("/api/v1/feature-engineering/process", json=request_data)
+        assert response.status_code == 500
+        data = response.json()
+        assert "Failed to process features" in data["detail"]
+
+    @patch("app.api.v1.endpoints.SimulationService")
+    def test_get_data_quality_report_success(self, mock_service_class):
+        """Test successful data quality report retrieval."""
+        mock_service = AsyncMock()
+        mock_service_class.return_value = mock_service
+
+        # Mock the process_session_data method
+        mock_processed_response = Mock()
+        mock_processed_response.processed_data = []
+        mock_processed_response.processing_summary.dict.return_value = {
+            "total_data_points": 100,
+            "total_drivers": 20,
+            "data_quality_score": 0.95,
+        }
+        mock_service.process_session_data.return_value = mock_processed_response
+
+        # Mock the feature engineering service
+        mock_feature_service = Mock()
+        mock_service.feature_engineering_service = mock_feature_service
+        mock_feature_service.get_data_quality_report.return_value = {
+            "total_records": 100,
+            "total_features": 15,
+            "data_quality_score": 0.95,
+            "missing_data_summary": {},
+        }
+
+        response = client.get("/api/v1/feature-engineering/quality-report/12345")
+        assert response.status_code == 200
+        data = response.json()
+
+        assert data["session_key"] == 12345
+        assert "quality_report" in data
+        assert "processing_summary" in data
+        assert data["quality_report"]["total_records"] == 100
+        assert data["quality_report"]["data_quality_score"] == 0.95
+
+    @patch("app.api.v1.endpoints.SimulationService")
+    def test_get_feature_importance_success(self, mock_service_class):
+        """Test successful feature importance retrieval."""
+        mock_service = AsyncMock()
+        mock_service_class.return_value = mock_service
+
+        # Mock the process_session_data method
+        mock_processed_response = Mock()
+        mock_processed_response.processed_data = []
+        mock_processed_response.processing_summary.dict.return_value = {
+            "total_data_points": 100,
+            "total_drivers": 20,
+            "data_quality_score": 0.95,
+        }
+        mock_service.process_session_data.return_value = mock_processed_response
+
+        # Mock the feature engineering service
+        mock_feature_service = Mock()
+        mock_service.feature_engineering_service = mock_feature_service
+        mock_feature_service.fit_transform_features.return_value = (
+            np.array([[1, 2, 3], [4, 5, 6]]),  # features
+            np.array([85.1, 84.9]),  # targets
+            {"feature_columns": ["col1", "col2", "col3"]},  # metadata
+        )
+        mock_feature_service.get_feature_importance.return_value = {
+            "col1": 0.8,
+            "col2": 0.6,
+            "col3": 0.4,
+        }
+
+        response = client.get("/api/v1/feature-engineering/feature-importance/12345")
+        assert response.status_code == 200
+        data = response.json()
+
+        assert data["session_key"] == 12345
+        assert "feature_importance" in data
+        assert "feature_metadata" in data
+        assert data["total_features"] == 3
+        assert data["feature_importance"]["col1"] == 0.8
+        assert data["feature_importance"]["col2"] == 0.6
+        assert data["feature_importance"]["col3"] == 0.4

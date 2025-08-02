@@ -23,7 +23,10 @@ from app.api.v1.schemas import (
     DataProcessingRequest,
     DataProcessingResponse,
 )
-from app.core.exceptions import InvalidSimulationParametersError
+from app.core.exceptions import (
+    InvalidSimulationParametersError,
+    FeatureEngineeringError,
+)
 from app.services.simulation_service import SimulationService
 
 logger = structlog.get_logger()
@@ -354,3 +357,155 @@ async def process_session_data(
             exc_info=True,
         )
         raise HTTPException(status_code=500, detail="Failed to process session data")
+
+
+@router.post("/feature-engineering/process", response_model=dict)
+async def process_features(
+    request: DataProcessingRequest,
+    simulation_service: SimulationService = Depends(get_simulation_service),
+) -> dict:
+    """Process session data through the feature engineering pipeline."""
+    logger.info("Processing features", session_key=request.session_key)
+    try:
+        # First get the processed data
+        processed_response = await simulation_service.process_session_data(request)
+
+        # Then apply feature engineering
+        features, targets, metadata = (
+            simulation_service.feature_engineering_service.fit_transform_features(
+                processed_response.processed_data, target_column="lap_time"
+            )
+        )
+
+        # Get feature importance scores
+        feature_importance = (
+            simulation_service.feature_engineering_service.get_feature_importance(
+                "lap_time"
+            )
+        )
+
+        # Get data quality report
+        data_quality_report = (
+            simulation_service.feature_engineering_service.get_data_quality_report(
+                processed_response.processed_data
+            )
+        )
+
+        return {
+            "session_key": request.session_key,
+            "features_shape": features.shape,
+            "targets_shape": targets.shape,
+            "feature_metadata": metadata,
+            "feature_importance": feature_importance,
+            "data_quality_report": data_quality_report,
+            "processing_summary": processed_response.processing_summary.dict(),
+        }
+
+    except FeatureEngineeringError as e:
+        logger.error("Feature engineering error", error=str(e))
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(
+            "Failed to process features",
+            session_key=request.session_key,
+            error=str(e),
+            exc_info=True,
+        )
+        raise HTTPException(status_code=500, detail="Failed to process features")
+
+
+@router.get("/feature-engineering/quality-report/{session_key}", response_model=dict)
+async def get_data_quality_report(
+    session_key: int,
+    simulation_service: SimulationService = Depends(get_simulation_service),
+) -> dict:
+    """Get a comprehensive data quality report for a session."""
+    logger.info("Getting data quality report", session_key=session_key)
+    try:
+        # Get session data
+        request = DataProcessingRequest(
+            session_key=session_key,
+            include_weather=True,
+            include_grid=True,
+            include_lap_times=True,
+            include_pit_stops=True,
+        )
+
+        processed_response = await simulation_service.process_session_data(request)
+
+        # Generate quality report
+        quality_report = (
+            simulation_service.feature_engineering_service.get_data_quality_report(
+                processed_response.processed_data
+            )
+        )
+
+        return {
+            "session_key": session_key,
+            "quality_report": quality_report,
+            "processing_summary": processed_response.processing_summary.dict(),
+        }
+
+    except Exception as e:
+        logger.error(
+            "Failed to get data quality report",
+            session_key=session_key,
+            error=str(e),
+            exc_info=True,
+        )
+        raise HTTPException(status_code=500, detail="Failed to get data quality report")
+
+
+@router.get(
+    "/feature-engineering/feature-importance/{session_key}", response_model=dict
+)
+async def get_feature_importance(
+    session_key: int,
+    simulation_service: SimulationService = Depends(get_simulation_service),
+) -> dict:
+    """Get feature importance scores for a session."""
+    logger.info("Getting feature importance", session_key=session_key)
+    try:
+        # Get session data and fit feature engineering pipeline
+        request = DataProcessingRequest(
+            session_key=session_key,
+            include_weather=True,
+            include_grid=True,
+            include_lap_times=True,
+            include_pit_stops=True,
+        )
+
+        processed_response = await simulation_service.process_session_data(request)
+
+        # Fit the feature engineering pipeline
+        features, targets, metadata = (
+            simulation_service.feature_engineering_service.fit_transform_features(
+                processed_response.processed_data, target_column="lap_time"
+            )
+        )
+
+        # Get feature importance
+        feature_importance = (
+            simulation_service.feature_engineering_service.get_feature_importance(
+                "lap_time"
+            )
+        )
+
+        return {
+            "session_key": session_key,
+            "feature_importance": feature_importance,
+            "feature_metadata": metadata,
+            "total_features": len(feature_importance),
+        }
+
+    except FeatureEngineeringError as e:
+        logger.error("Feature engineering error", error=str(e))
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(
+            "Failed to get feature importance",
+            session_key=session_key,
+            error=str(e),
+            exc_info=True,
+        )
+        raise HTTPException(status_code=500, detail="Failed to get feature importance")
