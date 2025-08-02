@@ -188,6 +188,61 @@ pytest --cov=app
 
 ## 🔧 Development
 
+### Pre-commit Hooks
+
+This project uses pre-commit hooks to ensure code quality. The hooks automatically run:
+
+- **Code formatting**: Black and Ruff format
+- **Linting**: Ruff for code quality checks
+- **File hygiene**: Trailing whitespace, end-of-file fixes
+- **Tests**: Pytest runs before pushing to ensure all tests pass
+
+#### Setup
+
+1. Install pre-commit:
+   ```bash
+   pip install pre-commit
+   ```
+
+2. Install the git hooks:
+   ```bash
+   pre-commit install
+   pre-commit install --hook-type pre-push
+   ```
+
+#### Usage
+
+- **Automatic**: Hooks run automatically on `git commit` and `git push`
+- **Manual**: Run all checks manually:
+  ```bash
+  ./scripts/check-code.sh
+  ```
+- **Individual hooks**: Run specific hooks:
+  ```bash
+  pre-commit run black --all-files
+  pre-commit run ruff --all-files
+  ```
+
+#### Skipping Hooks
+
+If you need to skip hooks (not recommended):
+```bash
+git commit --no-verify -m "Emergency fix"
+```
+
+### Running Tests
+
+```bash
+# Run all tests
+python3 -m pytest tests/ -v
+
+# Run with coverage
+python3 -m pytest --cov=app --cov-report=html
+
+# Run specific test file
+python3 -m pytest tests/test_simulation_service.py -v
+```
+
 ### Code Quality
 
 The project uses several tools for code quality:
