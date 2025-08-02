@@ -275,7 +275,7 @@ class TestSimulationEndpoints:
             mock_service = mock_service_class.return_value
             mock_service.get_simulation_result = AsyncMock(return_value=mock_result)
 
-            response = client.get("/api/v1/simulate/sim_123")
+            response = client.get("/api/v1/simulation/sim_123")
 
             assert response.status_code == 200
             data = response.json()
@@ -290,7 +290,7 @@ class TestSimulationEndpoints:
                 side_effect=InvalidSimulationParametersError("Simulation not found")
             )
 
-            response = client.get("/api/v1/simulate/nonexistent")
+            response = client.get("/api/v1/simulation/nonexistent")
 
             assert response.status_code == 404
 
