@@ -251,12 +251,12 @@ class TestIntegrationHealthAndStatus:
 
     def test_health_endpoint(self):
         """Test health check endpoint."""
-        response = client.get("/health")
+        response = client.get("/api/v1/health")
         assert response.status_code == 200
 
         data = response.json()
         assert data["status"] == "healthy"
-        assert "timestamp" in data
+        assert data["service"] == "f1-what-if-simulator"
 
     def test_api_documentation(self):
         """Test that API documentation is accessible."""

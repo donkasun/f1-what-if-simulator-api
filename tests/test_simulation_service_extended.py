@@ -36,7 +36,10 @@ class TestSimulationServiceWeatherData:
             }
         ]
 
-        with patch.object(SimulationService, "openf1_client") as mock_client:
+        with patch("app.services.simulation_service.OpenF1Client") as mock_client_class:
+            mock_client = mock_client_class.return_value
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=None)
             mock_client.get_sessions = AsyncMock(return_value=mock_sessions_data)
 
             service = SimulationService()
@@ -51,7 +54,10 @@ class TestSimulationServiceWeatherData:
     @pytest.mark.asyncio
     async def test_get_sessions_api_error(self):
         """Test session retrieval with API error."""
-        with patch.object(SimulationService, "openf1_client") as mock_client:
+        with patch("app.services.simulation_service.OpenF1Client") as mock_client_class:
+            mock_client = mock_client_class.return_value
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=None)
             mock_client.get_sessions = AsyncMock(
                 side_effect=OpenF1APIError("API error")
             )
@@ -77,7 +83,10 @@ class TestSimulationServiceWeatherData:
             }
         ]
 
-        with patch.object(SimulationService, "openf1_client") as mock_client:
+        with patch("app.services.simulation_service.OpenF1Client") as mock_client_class:
+            mock_client = mock_client_class.return_value
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=None)
             mock_client.get_weather_data = AsyncMock(return_value=mock_weather_data)
 
             service = SimulationService()
@@ -92,7 +101,10 @@ class TestSimulationServiceWeatherData:
     @pytest.mark.asyncio
     async def test_get_weather_data_api_error(self):
         """Test weather data retrieval with API error."""
-        with patch.object(SimulationService, "openf1_client") as mock_client:
+        with patch("app.services.simulation_service.OpenF1Client") as mock_client_class:
+            mock_client = mock_client_class.return_value
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=None)
             mock_client.get_weather_data = AsyncMock(
                 side_effect=OpenF1APIError("API error")
             )
@@ -116,7 +128,10 @@ class TestSimulationServiceWeatherData:
             "data_points": 10,
         }
 
-        with patch.object(SimulationService, "openf1_client") as mock_client:
+        with patch("app.services.simulation_service.OpenF1Client") as mock_client_class:
+            mock_client = mock_client_class.return_value
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=None)
             mock_client.get_session_weather_summary = AsyncMock(
                 return_value=mock_summary_data
             )
@@ -133,7 +148,10 @@ class TestSimulationServiceWeatherData:
     @pytest.mark.asyncio
     async def test_get_session_weather_summary_api_error(self):
         """Test weather summary retrieval with API error."""
-        with patch.object(SimulationService, "openf1_client") as mock_client:
+        with patch("app.services.simulation_service.OpenF1Client") as mock_client_class:
+            mock_client = mock_client_class.return_value
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=None)
             mock_client.get_session_weather_summary = AsyncMock(
                 side_effect=OpenF1APIError("API error")
             )
@@ -161,7 +179,10 @@ class TestSimulationServiceExtended:
             "data_points": 5,
         }
 
-        with patch.object(SimulationService, "openf1_client") as mock_client:
+        with patch("app.services.simulation_service.OpenF1Client") as mock_client_class:
+            mock_client = mock_client_class.return_value
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=None)
             mock_client.get_session_weather_summary = AsyncMock(
                 return_value=mock_weather_summary
             )

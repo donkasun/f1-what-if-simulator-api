@@ -200,13 +200,21 @@ class TestSimulationEndpoints:
     @pytest.mark.asyncio
     async def test_run_simulation_success(self):
         """Test successful simulation execution."""
-        mock_result = {
-            "simulation_id": "sim_123",
-            "predicted_lap_time": 85.234,
-            "confidence_score": 0.92,
-            "weather_conditions": "dry",
-            "car_setup": {},
-        }
+        from app.api.v1.schemas import SimulationResponse
+        from datetime import datetime
+
+        mock_result = SimulationResponse(
+            simulation_id="sim_123",
+            driver_id=1,
+            track_id=1,
+            season=2024,
+            predicted_lap_time=85.234,
+            confidence_score=0.92,
+            weather_conditions="dry",
+            car_setup={},
+            created_at=datetime.utcnow(),
+            processing_time_ms=1000,
+        )
 
         with patch("app.api.v1.endpoints.SimulationService") as mock_service_class:
             mock_service = mock_service_class.return_value
@@ -247,13 +255,21 @@ class TestSimulationEndpoints:
     @pytest.mark.asyncio
     async def test_get_simulation_result_success(self):
         """Test successful retrieval of simulation result."""
-        mock_result = {
-            "simulation_id": "sim_123",
-            "predicted_lap_time": 85.234,
-            "confidence_score": 0.92,
-            "weather_conditions": "dry",
-            "car_setup": {},
-        }
+        from app.api.v1.schemas import SimulationResponse
+        from datetime import datetime
+
+        mock_result = SimulationResponse(
+            simulation_id="sim_123",
+            driver_id=1,
+            track_id=1,
+            season=2024,
+            predicted_lap_time=85.234,
+            confidence_score=0.92,
+            weather_conditions="dry",
+            car_setup={},
+            created_at=datetime.utcnow(),
+            processing_time_ms=1000,
+        )
 
         with patch("app.api.v1.endpoints.SimulationService") as mock_service_class:
             mock_service = mock_service_class.return_value
@@ -276,7 +292,7 @@ class TestSimulationEndpoints:
 
             response = client.get("/api/v1/simulate/nonexistent")
 
-            assert response.status_code == 400
+            assert response.status_code == 404
 
 
 class TestHealthEndpoint:
