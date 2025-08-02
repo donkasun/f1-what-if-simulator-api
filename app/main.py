@@ -63,15 +63,15 @@ def create_app() -> FastAPI:
             url=str(request.url),
             client_ip=request.client.host if request.client else None,
         )
-        
+
         response = await call_next(request)
-        
+
         logger.info(
             "Request completed",
             request_id=request_id,
             status_code=response.status_code,
         )
-        
+
         return response
 
     # Global exception handlers
@@ -146,4 +146,4 @@ if __name__ == "__main__":
         port=settings.port,
         reload=settings.debug,
         log_level=settings.log_level.lower(),
-    ) 
+    )

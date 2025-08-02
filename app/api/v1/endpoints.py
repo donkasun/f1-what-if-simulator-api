@@ -43,7 +43,9 @@ async def get_drivers(
         drivers = await simulation_service.get_drivers(season)
         return drivers
     except Exception as e:
-        logger.error("Failed to fetch drivers", season=season, error=str(e), exc_info=True)
+        logger.error(
+            "Failed to fetch drivers", season=season, error=str(e), exc_info=True
+        )
         raise HTTPException(status_code=500, detail="Failed to fetch drivers")
 
 
@@ -58,7 +60,9 @@ async def get_tracks(
         tracks = await simulation_service.get_tracks(season)
         return tracks
     except Exception as e:
-        logger.error("Failed to fetch tracks", season=season, error=str(e), exc_info=True)
+        logger.error(
+            "Failed to fetch tracks", season=season, error=str(e), exc_info=True
+        )
         raise HTTPException(status_code=500, detail="Failed to fetch tracks")
 
 
@@ -103,13 +107,24 @@ async def get_simulation_result(
     logger.info("Fetching simulation result", simulation_id=simulation_id)
     try:
         result = await simulation_service.get_simulation_result(simulation_id)
-        logger.info("Successfully fetched simulation result", simulation_id=simulation_id)
+        logger.info(
+            "Successfully fetched simulation result", simulation_id=simulation_id
+        )
         return result
     except InvalidSimulationParametersError as e:
-        logger.error("Failed to fetch simulation result", simulation_id=simulation_id, error=str(e))
+        logger.error(
+            "Failed to fetch simulation result",
+            simulation_id=simulation_id,
+            error=str(e),
+        )
         raise HTTPException(status_code=404, detail="Simulation not found")
     except Exception as e:
-        logger.error("Failed to fetch simulation result", simulation_id=simulation_id, error=str(e), exc_info=True)
+        logger.error(
+            "Failed to fetch simulation result",
+            simulation_id=simulation_id,
+            error=str(e),
+            exc_info=True,
+        )
         raise HTTPException(status_code=500, detail="Failed to fetch simulation result")
 
 
@@ -140,4 +155,4 @@ async def remove_from_cache(
     if removed:
         return {"message": f"Simulation {simulation_id} removed from cache"}
     else:
-        raise HTTPException(status_code=404, detail="Simulation not found in cache") 
+        raise HTTPException(status_code=404, detail="Simulation not found in cache")

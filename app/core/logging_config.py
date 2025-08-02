@@ -14,7 +14,7 @@ from app.core.config import settings
 
 def setup_logging() -> None:
     """Configure structured logging for the application."""
-    
+
     # Configure structlog
     structlog.configure(
         processors=[
@@ -26,21 +26,25 @@ def setup_logging() -> None:
             structlog.processors.StackInfoRenderer(),
             structlog.processors.format_exc_info,
             structlog.processors.UnicodeDecoder(),
-            structlog.processors.JSONRenderer() if settings.log_format == "json" else structlog.dev.ConsoleRenderer(),
+            (
+                structlog.processors.JSONRenderer()
+                if settings.log_format == "json"
+                else structlog.dev.ConsoleRenderer()
+            ),
         ],
         context_class=dict,
         logger_factory=LoggerFactory(),
         wrapper_class=structlog.stdlib.BoundLogger,
         cache_logger_on_first_use=True,
     )
-    
+
     # Configure standard library logging
     logging.basicConfig(
         format="%(message)s",
         stream=sys.stdout,
         level=getattr(logging, settings.log_level.upper()),
     )
-    
+
     # Set specific log levels for noisy libraries
     logging.getLogger("httpx").setLevel(logging.WARNING)
     logging.getLogger("urllib3").setLevel(logging.WARNING)
@@ -49,19 +53,21 @@ def setup_logging() -> None:
 
 def get_logger(name: str = "") -> structlog.BoundLogger:
     """Get a structured logger instance.
-    
+
     Args:
         name: Logger name (optional)
-        
+
     Returns:
         Configured structured logger
     """
     return structlog.get_logger(name)
 
 
-def log_request_info(logger: structlog.BoundLogger, request_info: Dict[str, Any]) -> None:
+def log_request_info(
+    logger: structlog.BoundLogger, request_info: Dict[str, Any]
+) -> None:
     """Log standardized request information.
-    
+
     Args:
         logger: Structured logger instance
         request_info: Dictionary containing request details
@@ -76,9 +82,11 @@ def log_request_info(logger: structlog.BoundLogger, request_info: Dict[str, Any]
     )
 
 
-def log_response_info(logger: structlog.BoundLogger, response_info: Dict[str, Any]) -> None:
+def log_response_info(
+    logger: structlog.BoundLogger, response_info: Dict[str, Any]
+) -> None:
     """Log standardized response information.
-    
+
     Args:
         logger: Structured logger instance
         response_info: Dictionary containing response details
@@ -101,7 +109,7 @@ def log_external_api_call(
     error: str = "",
 ) -> None:
     """Log external API call information.
-    
+
     Args:
         logger: Structured logger instance
         api_name: Name of the external API
@@ -118,7 +126,7 @@ def log_external_api_call(
         "status_code": status_code,
         "response_time_ms": response_time_ms,
     }
-    
+
     if error:
         logger.error("External API call failed", **log_data, error=error)
     else:
@@ -135,7 +143,7 @@ def log_simulation_event(
     **kwargs,
 ) -> None:
     """Log simulation-related events.
-    
+
     Args:
         logger: Structured logger instance
         event_type: Type of simulation event
@@ -152,4 +160,4 @@ def log_simulation_event(
         track_id=track_id,
         season=season,
         **kwargs,
-    ) 
+    )
