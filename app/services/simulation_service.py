@@ -13,9 +13,13 @@ from typing import Any, Dict, List, Optional
 import structlog
 from async_lru import alru_cache
 
-from app.core.exceptions import DriverNotFoundError, InvalidSimulationParametersError
+from app.core.exceptions import (
+    DriverNotFoundError,
+    InvalidSimulationParametersError,
+)
 from app.external.openf1_client import OpenF1Client
 from app.models.model_loader import ModelLoader
+from app.services.feature_engineering_service import FeatureEngineeringService
 from app.api.v1.schemas import (
     DriverResponse,
     SimulationRequest,
@@ -52,6 +56,7 @@ class SimulationService:
         """Initialize the simulation service with dependencies."""
         self.openf1_client = OpenF1Client()
         self.model_loader = ModelLoader()
+        self.feature_engineering_service = FeatureEngineeringService()
         # Use the global cache instead of instance-level cache
         self._simulation_cache = _simulation_cache
 
@@ -569,7 +574,8 @@ class SimulationService:
                 processing_time_ms=processing_time_ms,
             )
 
-            return result
+            response: SimulationResponse = result
+            return response
 
         except (DriverNotFoundError, InvalidSimulationParametersError):
             # Re-raise business exceptions
@@ -601,7 +607,8 @@ class SimulationService:
                 f"Simulation {simulation_id} not found"
             )
 
-        return self._simulation_cache[simulation_id]
+        result: SimulationResponse = self._simulation_cache[simulation_id]
+        return result
 
     def get_cache_stats(self) -> dict:
         """
@@ -723,31 +730,62 @@ class SimulationService:
                     else 0
                 )
 
-                # Calculate data quality metrics
-                missing_data_points = sum(
-                    1
-                    for dp in processed_data_points
-                    if dp.lap_time is None or dp.air_temperature is None
-                )
-                data_quality_score = (
-                    1.0 - (missing_data_points / total_data_points)
-                    if total_data_points > 0
-                    else 0.0
-                )
+                # Use feature engineering service to process data
+                try:
+                    features, targets, feature_metadata = (
+                        self.feature_engineering_service.fit_transform_features(
+                            processed_data_points, target_column="lap_time"
+                        )
+                    )
 
-                # Define feature and target columns
-                feature_columns = [
-                    "lap_number",
-                    "tire_compound",
-                    "fuel_load",
-                    "grid_position",
-                    "air_temperature",
-                    "track_temperature",
-                    "humidity",
-                    "weather_condition",
-                    "pit_stop_count",
-                    "total_pit_time",
-                ]
+                    # Get data quality report
+                    data_quality_report = (
+                        self.feature_engineering_service.get_data_quality_report(
+                            processed_data_points
+                        )
+                    )
+
+                    # Extract metrics from feature engineering metadata
+                    data_quality_score = data_quality_report["data_quality_score"]
+                    missing_data_points = sum(
+                        report["missing_count"]
+                        for report in data_quality_report[
+                            "missing_data_summary"
+                        ].values()
+                    )
+                    feature_columns = feature_metadata["feature_columns"]
+
+                    logger.info(
+                        "Feature engineering completed successfully",
+                        features_shape=features.shape,
+                        data_quality_score=data_quality_score,
+                    )
+
+                except Exception as e:
+                    logger.error("Feature engineering failed", error=str(e))
+                    # Fallback to basic metrics
+                    missing_data_points = sum(
+                        1
+                        for dp in processed_data_points
+                        if dp.lap_time is None or dp.air_temperature is None
+                    )
+                    data_quality_score = (
+                        1.0 - (missing_data_points / total_data_points)
+                        if total_data_points > 0
+                        else 0.0
+                    )
+                    feature_columns = [
+                        "lap_number",
+                        "tire_compound",
+                        "fuel_load",
+                        "grid_position",
+                        "air_temperature",
+                        "track_temperature",
+                        "humidity",
+                        "weather_condition",
+                        "pit_stop_count",
+                        "total_pit_time",
+                    ]
 
                 target_columns = [
                     "lap_time",

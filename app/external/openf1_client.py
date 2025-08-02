@@ -931,7 +931,7 @@ class OpenF1Client:
 
     async def _make_request(
         self, method: str, endpoint: str, params: Optional[Dict] = None
-    ) -> List[Dict]:  # type: ignore
+    ) -> List[Dict]:
         """
         Make an HTTP request to the OpenF1 API.
 
@@ -974,7 +974,8 @@ class OpenF1Client:
                     response_time_ms=response_time_ms,
                     data_count=len(data) if isinstance(data, list) else 1,
                 )
-                return data
+                result: List[Dict] = data
+                return result
             else:
                 logger.error(
                     "OpenF1 API request failed",

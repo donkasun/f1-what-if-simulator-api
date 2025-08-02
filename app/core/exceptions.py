@@ -75,3 +75,10 @@ class CacheError(F1SimulatorError):
         self.operation = operation
         self.error = error
         super().__init__(f"Cache {operation} failed: {error}", "CACHE_ERROR")
+
+
+class FeatureEngineeringError(F1SimulatorError):
+    """Raised when feature engineering operations fail."""
+
+    def __init__(self, message: str):
+        super().__init__(message, "FEATURE_ENGINEERING_ERROR")

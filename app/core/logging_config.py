@@ -60,7 +60,8 @@ def get_logger(name: str = "") -> structlog.BoundLogger:
     Returns:
         Configured structured logger
     """
-    return structlog.get_logger(name)
+    logger: structlog.BoundLogger = structlog.get_logger(name)
+    return logger
 
 
 def log_request_info(
