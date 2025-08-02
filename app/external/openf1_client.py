@@ -177,31 +177,29 @@ class OpenF1Client:
             }
 
         # Calculate averages
-        air_temps = [
-            w.get("air_temperature")
-            for w in weather_data
-            if w.get("air_temperature") is not None
-        ]
-        track_temps = [
-            w.get("track_temperature")
-            for w in weather_data
-            if w.get("track_temperature") is not None
-        ]
-        humidities = [
-            w.get("humidity") for w in weather_data if w.get("humidity") is not None
-        ]
-        pressures = [
-            w.get("pressure") for w in weather_data if w.get("pressure") is not None
-        ]
-        wind_speeds = [
-            w.get("wind_speed") for w in weather_data if w.get("wind_speed") is not None
-        ]
-        rainfalls = [
-            w.get("rainfall") for w in weather_data if w.get("rainfall") is not None
-        ]
+        air_temps: List[float] = []
+        track_temps: List[float] = []
+        humidities: List[float] = []
+        pressures: List[float] = []
+        wind_speeds: List[float] = []
+        rainfalls: List[float] = []
+
+        for w in weather_data:
+            if w.get("air_temperature") is not None:
+                air_temps.append(float(w["air_temperature"]))
+            if w.get("track_temperature") is not None:
+                track_temps.append(float(w["track_temperature"]))
+            if w.get("humidity") is not None:
+                humidities.append(float(w["humidity"]))
+            if w.get("pressure") is not None:
+                pressures.append(float(w["pressure"]))
+            if w.get("wind_speed") is not None:
+                wind_speeds.append(float(w["wind_speed"]))
+            if w.get("rainfall") is not None:
+                rainfalls.append(float(w["rainfall"]))
 
         # Determine weather condition based on rainfall
-        total_rainfall = sum(rainfalls) if rainfalls else 0
+        total_rainfall = sum(rainfalls) if rainfalls else 0.0
         weather_condition = "wet" if total_rainfall > 0.1 else "dry"
 
         return {
