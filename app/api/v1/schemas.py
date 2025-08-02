@@ -325,9 +325,11 @@ class GridSummaryResponse(BaseModel):
     """Response schema for grid summary statistics."""
 
     session_key: int = Field(..., description="Session identifier")
-    pole_position: GridPositionResponse = Field(..., description="Pole position driver")
-    fastest_qualifying_time: float = Field(
-        ..., description="Fastest qualifying time in seconds"
+    pole_position: Optional[GridPositionResponse] = Field(
+        None, description="Pole position driver"
+    )
+    fastest_qualifying_time: Optional[float] = Field(
+        None, description="Fastest qualifying time in seconds"
     )
     slowest_qualifying_time: Optional[float] = Field(
         None, description="Slowest qualifying time in seconds"

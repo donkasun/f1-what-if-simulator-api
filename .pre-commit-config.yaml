@@ -23,6 +23,12 @@ repos:
         args: [--fix, --exit-non-zero-on-fix]
       - id: ruff-format
 
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.8.0
+    hooks:
+      - id: mypy
+        args: [--ignore-missing-imports]
+
   - repo: local
     hooks:
       - id: pytest
@@ -32,4 +38,4 @@ repos:
         pass_filenames: false
         always_run: true
         args: [tests/, --tb=short]
-        stages: [push]
+        stages: [pre-push]
