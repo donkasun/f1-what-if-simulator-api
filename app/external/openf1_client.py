@@ -61,7 +61,7 @@ class OpenF1Client:
         Raises:
             OpenF1APIError: If API call fails
         """
-        endpoint = f"/drivers"
+        endpoint = "/drivers"
         params = {"year": season}
         
         return await self._make_request("GET", endpoint, params=params)
@@ -80,7 +80,7 @@ class OpenF1Client:
         Raises:
             OpenF1APIError: If API call fails
         """
-        endpoint = f"/circuits"
+        endpoint = "/circuits"
         params = {"year": season}
         
         return await self._make_request("GET", endpoint, params=params)
@@ -102,7 +102,7 @@ class OpenF1Client:
         Raises:
             OpenF1APIError: If API call fails
         """
-        endpoint = f"/lap_times"
+        endpoint = "/lap_times"
         params = {
             "driver_id": driver_id,
             "circuit_id": track_id,

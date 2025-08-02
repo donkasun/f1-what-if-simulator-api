@@ -7,7 +7,7 @@ including ML model integration and result caching.
 
 import time
 import uuid
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import List
 
 import structlog
@@ -214,7 +214,7 @@ class SimulationService:
                 confidence_score=confidence_score,
                 weather_conditions=request.weather_conditions,
                 car_setup=request.car_setup,
-                created_at=datetime.utcnow(),
+                created_at=datetime.now(UTC),
                 processing_time_ms=processing_time_ms
             )
             

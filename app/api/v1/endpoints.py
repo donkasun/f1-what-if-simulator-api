@@ -6,7 +6,6 @@ from typing import List
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query
-from fastapi.responses import JSONResponse
 
 from app.api.v1.schemas import (
     DriverResponse,
