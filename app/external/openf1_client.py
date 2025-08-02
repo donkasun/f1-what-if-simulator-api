@@ -110,6 +110,116 @@ class OpenF1Client:
         # Process the data to extract meaningful statistics
         return self._process_historical_data(lap_times)
 
+    @alru_cache(maxsize=50)
+    async def get_sessions(self, season: int) -> List[Dict]:
+        """
+        Get all sessions for a specific season.
+
+        Args:
+            season: F1 season year
+
+        Returns:
+            List of session data
+
+        Raises:
+            OpenF1APIError: If API call fails
+        """
+        endpoint = "/v1/sessions"
+        params = {"year": season}
+
+        return await self._make_request("GET", endpoint, params=params)
+
+    @alru_cache(maxsize=100)
+    async def get_weather_data(self, session_key: int) -> List[Dict]:
+        """
+        Get weather data for a specific session.
+
+        Args:
+            session_key: Session identifier
+
+        Returns:
+            List of weather data points
+
+        Raises:
+            OpenF1APIError: If API call fails
+        """
+        endpoint = "/v1/weather"
+        params = {"session_key": session_key}
+
+        return await self._make_request("GET", endpoint, params=params)
+
+    async def get_session_weather_summary(self, session_key: int) -> Dict:
+        """
+        Get weather summary for a specific session.
+
+        Args:
+            session_key: Session identifier
+
+        Returns:
+            Weather summary with averages and conditions
+
+        Raises:
+            OpenF1APIError: If API call fails
+        """
+        weather_data = await self.get_weather_data(session_key)
+
+        if not weather_data:
+            return {
+                "session_key": session_key,
+                "weather_condition": "unknown",
+                "avg_air_temperature": None,
+                "avg_track_temperature": None,
+                "avg_humidity": None,
+                "avg_pressure": None,
+                "avg_wind_speed": None,
+                "total_rainfall": None,
+                "data_points": 0,
+            }
+
+        # Calculate averages
+        air_temps: List[float] = []
+        track_temps: List[float] = []
+        humidities: List[float] = []
+        pressures: List[float] = []
+        wind_speeds: List[float] = []
+        rainfalls: List[float] = []
+
+        for w in weather_data:
+            if w.get("air_temperature") is not None:
+                air_temps.append(float(w["air_temperature"]))
+            if w.get("track_temperature") is not None:
+                track_temps.append(float(w["track_temperature"]))
+            if w.get("humidity") is not None:
+                humidities.append(float(w["humidity"]))
+            if w.get("pressure") is not None:
+                pressures.append(float(w["pressure"]))
+            if w.get("wind_speed") is not None:
+                wind_speeds.append(float(w["wind_speed"]))
+            if w.get("rainfall") is not None:
+                rainfalls.append(float(w["rainfall"]))
+
+        # Determine weather condition based on rainfall
+        total_rainfall = sum(rainfalls) if rainfalls else 0.0
+        weather_condition = "wet" if total_rainfall > 0.1 else "dry"
+
+        return {
+            "session_key": session_key,
+            "weather_condition": weather_condition,
+            "avg_air_temperature": (
+                sum(air_temps) / len(air_temps) if air_temps else None
+            ),
+            "avg_track_temperature": (
+                sum(track_temps) / len(track_temps) if track_temps else None
+            ),
+            "avg_humidity": sum(humidities) / len(humidities) if humidities else None,
+            "avg_pressure": sum(pressures) / len(pressures) if pressures else None,
+            "avg_wind_speed": (
+                sum(wind_speeds) / len(wind_speeds) if wind_speeds else None
+            ),
+            "total_rainfall": total_rainfall,
+            "data_points": len(weather_data),
+        }
+
     async def _make_request(
         self, method: str, endpoint: str, params: Optional[Dict] = None
     ) -> List[Dict]:  # type: ignore
