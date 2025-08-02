@@ -564,3 +564,191 @@ class DriverPerformanceSummaryResponse(BaseModel):
             }
         }
     }
+
+
+class DataProcessingRequest(BaseModel):
+    """Request schema for data processing operations."""
+
+    session_key: int = Field(..., description="Session identifier")
+    include_weather: bool = Field(
+        default=True, description="Include weather data in processing"
+    )
+    include_grid: bool = Field(
+        default=True, description="Include grid data in processing"
+    )
+    include_lap_times: bool = Field(
+        default=True, description="Include lap times data in processing"
+    )
+    include_pit_stops: bool = Field(
+        default=True, description="Include pit stops data in processing"
+    )
+    processing_options: Optional[dict] = Field(
+        default_factory=dict, description="Additional processing options"
+    )
+
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "session_key": 9472,
+                "include_weather": True,
+                "include_grid": True,
+                "include_lap_times": True,
+                "include_pit_stops": True,
+                "processing_options": {
+                    "align_timestamps": True,
+                    "fill_missing_values": True,
+                    "normalize_features": True,
+                },
+            }
+        }
+    }
+
+
+class ProcessedDataPoint(BaseModel):
+    """Schema for a single processed data point."""
+
+    timestamp: datetime = Field(..., description="Data point timestamp")
+    driver_id: int = Field(..., description="Driver identifier")
+    lap_number: int = Field(..., description="Lap number")
+    lap_time: Optional[float] = Field(None, description="Lap time in seconds")
+    sector_1_time: Optional[float] = Field(None, description="Sector 1 time in seconds")
+    sector_2_time: Optional[float] = Field(None, description="Sector 2 time in seconds")
+    sector_3_time: Optional[float] = Field(None, description="Sector 3 time in seconds")
+    tire_compound: Optional[str] = Field(None, description="Current tire compound")
+    fuel_load: Optional[float] = Field(None, description="Current fuel load in kg")
+    grid_position: Optional[int] = Field(None, description="Starting grid position")
+    current_position: Optional[int] = Field(None, description="Current race position")
+    air_temperature: Optional[float] = Field(
+        None, description="Air temperature in Celsius"
+    )
+    track_temperature: Optional[float] = Field(
+        None, description="Track temperature in Celsius"
+    )
+    humidity: Optional[float] = Field(None, description="Humidity percentage")
+    weather_condition: Optional[str] = Field(None, description="Weather condition")
+    pit_stop_count: int = Field(default=0, description="Number of pit stops completed")
+    total_pit_time: float = Field(default=0.0, description="Total time spent in pits")
+    lap_status: str = Field(..., description="Lap status (valid/invalid/dnf)")
+
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "timestamp": "2024-03-02T15:30:00Z",
+                "driver_id": 1,
+                "lap_number": 15,
+                "lap_time": 78.456,
+                "sector_1_time": 25.123,
+                "sector_2_time": 26.789,
+                "sector_3_time": 26.544,
+                "tire_compound": "soft",
+                "fuel_load": 45.2,
+                "grid_position": 1,
+                "current_position": 1,
+                "air_temperature": 25.5,
+                "track_temperature": 35.2,
+                "humidity": 45.0,
+                "weather_condition": "dry",
+                "pit_stop_count": 1,
+                "total_pit_time": 2.8,
+                "lap_status": "valid",
+            }
+        }
+    }
+
+
+class DataProcessingSummary(BaseModel):
+    """Schema for data processing summary statistics."""
+
+    session_key: int = Field(..., description="Session identifier")
+    total_data_points: int = Field(
+        ..., description="Total number of processed data points"
+    )
+    total_drivers: int = Field(..., description="Total number of drivers")
+    total_laps: int = Field(..., description="Total number of laps")
+    data_sources: List[str] = Field(
+        ..., description="Data sources included in processing"
+    )
+    processing_time_ms: int = Field(
+        ..., description="Time taken for processing in milliseconds"
+    )
+    missing_data_points: int = Field(..., description="Number of missing data points")
+    data_quality_score: float = Field(..., description="Data quality score (0-1)")
+    features_generated: List[str] = Field(..., description="List of features generated")
+    processing_errors: List[str] = Field(
+        default_factory=list, description="List of processing errors"
+    )
+
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "session_key": 9472,
+                "total_data_points": 1040,
+                "total_drivers": 20,
+                "total_laps": 52,
+                "data_sources": ["weather", "grid", "lap_times", "pit_stops"],
+                "processing_time_ms": 1250,
+                "missing_data_points": 15,
+                "data_quality_score": 0.95,
+                "features_generated": [
+                    "lap_time_normalized",
+                    "fuel_load_normalized",
+                    "tire_wear_estimate",
+                    "position_change",
+                    "weather_impact_score",
+                ],
+                "processing_errors": [],
+            }
+        }
+    }
+
+
+class DataProcessingResponse(BaseModel):
+    """Response schema for data processing results."""
+
+    session_key: int = Field(..., description="Session identifier")
+    session_name: str = Field(..., description="Session name")
+    track_name: str = Field(..., description="Track name")
+    country: str = Field(..., description="Country")
+    year: int = Field(..., description="Season year")
+    processing_summary: DataProcessingSummary = Field(
+        ..., description="Processing summary"
+    )
+    processed_data: List[ProcessedDataPoint] = Field(
+        ..., description="Processed data points"
+    )
+    feature_columns: List[str] = Field(..., description="List of feature column names")
+    target_columns: List[str] = Field(..., description="List of target column names")
+    created_at: datetime = Field(..., description="Processing completion timestamp")
+
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "session_key": 9472,
+                "session_name": "2024 Bahrain Grand Prix",
+                "track_name": "Bahrain International Circuit",
+                "country": "Bahrain",
+                "year": 2024,
+                "processing_summary": {},
+                "processed_data": [],
+                "feature_columns": [
+                    "lap_number",
+                    "tire_compound_encoded",
+                    "fuel_load_normalized",
+                    "air_temperature",
+                    "track_temperature",
+                    "humidity",
+                    "weather_condition_encoded",
+                    "grid_position",
+                    "pit_stop_count",
+                    "total_pit_time",
+                ],
+                "target_columns": [
+                    "lap_time",
+                    "sector_1_time",
+                    "sector_2_time",
+                    "sector_3_time",
+                ],
+                "created_at": "2024-01-15T10:30:00Z",
+            }
+        }
+    }

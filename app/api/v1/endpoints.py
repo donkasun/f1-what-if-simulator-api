@@ -20,6 +20,8 @@ from app.api.v1.schemas import (
     LapTimesResponse,
     PitStopsResponse,
     DriverPerformanceSummaryResponse,
+    DataProcessingRequest,
+    DataProcessingResponse,
 )
 from app.core.exceptions import InvalidSimulationParametersError
 from app.services.simulation_service import SimulationService
@@ -325,3 +327,30 @@ async def get_driver_performance(
         raise HTTPException(
             status_code=500, detail="Failed to fetch driver performance"
         )
+
+
+@router.post("/data-processing", response_model=DataProcessingResponse)
+async def process_session_data(
+    request: DataProcessingRequest,
+    simulation_service: SimulationService = Depends(get_simulation_service),
+) -> DataProcessingResponse:
+    """Process and merge all session data into training-ready format."""
+    logger.info(
+        "Processing session data",
+        session_key=request.session_key,
+        include_weather=request.include_weather,
+        include_grid=request.include_grid,
+        include_lap_times=request.include_lap_times,
+        include_pit_stops=request.include_pit_stops,
+    )
+    try:
+        processed_data = await simulation_service.process_session_data(request)
+        return processed_data
+    except Exception as e:
+        logger.error(
+            "Failed to process session data",
+            session_key=request.session_key,
+            error=str(e),
+            exc_info=True,
+        )
+        raise HTTPException(status_code=500, detail="Failed to process session data")

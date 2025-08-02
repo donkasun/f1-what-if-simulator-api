@@ -8,7 +8,7 @@ including ML model integration and result caching.
 import time
 import uuid
 from datetime import datetime, UTC
-from typing import Any, List
+from typing import Any, Dict, List, Optional
 
 import structlog
 from async_lru import alru_cache
@@ -33,6 +33,10 @@ from app.api.v1.schemas import (
     PitStopResponse,
     DriverPerformanceSummaryResponse,
     DriverPerformanceResponse,
+    DataProcessingRequest,
+    DataProcessingResponse,
+    DataProcessingSummary,
+    ProcessedDataPoint,
 )
 
 logger = structlog.get_logger()
@@ -633,6 +637,268 @@ class SimulationService:
             logger.info("Removed simulation from cache", simulation_id=simulation_id)
             return True
         return False
+
+    async def process_session_data(
+        self, request: DataProcessingRequest
+    ) -> DataProcessingResponse:
+        """
+        Process and merge all session data into training-ready format.
+
+        Args:
+            request: Data processing request with options
+
+        Returns:
+            Processed data with merged features
+        """
+        logger.info("Processing session data", session_key=request.session_key)
+        start_time = time.time()
+
+        try:
+            async with self.openf1_client as client:
+                # Fetch all required data sources
+                data_sources = []
+                session_info = None
+                weather_data = None
+                grid_data = None
+                lap_times_data = None
+                pit_stops_data = None
+
+                # Get session info
+                sessions = await client.get_sessions(
+                    2024
+                )  # TODO: Get year from session_key
+                for session in sessions:
+                    if session.get("session_key") == request.session_key:
+                        session_info = session
+                        break
+
+                if not session_info:
+                    raise ValueError(f"Session {request.session_key} not found")
+
+                # Fetch weather data if requested
+                if request.include_weather:
+                    weather_data = await client.get_session_weather_summary(
+                        request.session_key
+                    )
+                    data_sources.append("weather")
+
+                # Fetch grid data if requested
+                if request.include_grid:
+                    grid_data = await client.get_session_grid_summary(
+                        request.session_key
+                    )
+                    data_sources.append("grid")
+
+                # Fetch lap times data if requested
+                if request.include_lap_times:
+                    lap_times_data = await client.get_session_lap_times_summary(
+                        request.session_key
+                    )
+                    data_sources.append("lap_times")
+
+                # Fetch pit stops data if requested
+                if request.include_pit_stops:
+                    pit_stops_data = await client.get_session_pit_stops_summary(
+                        request.session_key
+                    )
+                    data_sources.append("pit_stops")
+
+                # Process and merge the data
+                processed_data_points = self._merge_and_process_data(
+                    session_info,
+                    weather_data,
+                    grid_data,
+                    lap_times_data,
+                    pit_stops_data,
+                    request.processing_options or {},
+                )
+
+                # Calculate processing statistics
+                processing_time_ms = int((time.time() - start_time) * 1000)
+                total_data_points = len(processed_data_points)
+                total_drivers = len(set(dp.driver_id for dp in processed_data_points))
+                total_laps = (
+                    max(dp.lap_number for dp in processed_data_points)
+                    if processed_data_points
+                    else 0
+                )
+
+                # Calculate data quality metrics
+                missing_data_points = sum(
+                    1
+                    for dp in processed_data_points
+                    if dp.lap_time is None or dp.air_temperature is None
+                )
+                data_quality_score = (
+                    1.0 - (missing_data_points / total_data_points)
+                    if total_data_points > 0
+                    else 0.0
+                )
+
+                # Define feature and target columns
+                feature_columns = [
+                    "lap_number",
+                    "tire_compound",
+                    "fuel_load",
+                    "grid_position",
+                    "air_temperature",
+                    "track_temperature",
+                    "humidity",
+                    "weather_condition",
+                    "pit_stop_count",
+                    "total_pit_time",
+                ]
+
+                target_columns = [
+                    "lap_time",
+                    "sector_1_time",
+                    "sector_2_time",
+                    "sector_3_time",
+                ]
+
+                # Generate derived features
+                features_generated = [
+                    "lap_time_normalized",
+                    "fuel_load_normalized",
+                    "tire_wear_estimate",
+                    "position_change",
+                    "weather_impact_score",
+                ]
+
+                # Create processing summary
+                processing_summary = DataProcessingSummary(
+                    session_key=request.session_key,
+                    total_data_points=total_data_points,
+                    total_drivers=total_drivers,
+                    total_laps=total_laps,
+                    data_sources=data_sources,
+                    processing_time_ms=processing_time_ms,
+                    missing_data_points=missing_data_points,
+                    data_quality_score=data_quality_score,
+                    features_generated=features_generated,
+                    processing_errors=[],
+                )
+
+                return DataProcessingResponse(
+                    session_key=request.session_key,
+                    session_name=session_info.get("session_name", "Unknown Session"),
+                    track_name=session_info.get("location", "Unknown Track"),
+                    country=session_info.get("country_name", "Unknown"),
+                    year=session_info.get("year", 2024),
+                    processing_summary=processing_summary,
+                    processed_data=processed_data_points,
+                    feature_columns=feature_columns,
+                    target_columns=target_columns,
+                    created_at=datetime.now(UTC),
+                )
+
+        except Exception as e:
+            logger.error(
+                "Failed to process session data",
+                session_key=request.session_key,
+                error=str(e),
+                exc_info=True,
+            )
+            raise
+
+    def _merge_and_process_data(
+        self,
+        session_info: dict,
+        weather_data: Optional[dict],
+        grid_data: Optional[dict],
+        lap_times_data: Optional[dict],
+        pit_stops_data: Optional[dict],
+        processing_options: dict,
+    ) -> List[ProcessedDataPoint]:
+        """
+        Merge and process data from multiple sources.
+
+        Args:
+            session_info: Session information
+            weather_data: Weather data summary
+            grid_data: Grid data summary
+            lap_times_data: Lap times data
+            pit_stops_data: Pit stops data
+            processing_options: Processing options
+
+        Returns:
+            List of processed data points
+        """
+        processed_points: List[ProcessedDataPoint] = []
+
+        if not lap_times_data or not lap_times_data.get("lap_times"):
+            return processed_points
+
+        # Create mappings for efficient lookup
+        grid_positions: Dict[int, int] = {}
+        if grid_data and grid_data.get("grid_positions"):
+            for pos in grid_data["grid_positions"]:
+                driver_id = pos.get("driver_id")
+                if driver_id:
+                    grid_positions[driver_id] = pos.get("position")
+
+        pit_stops_by_driver: Dict[int, List[Dict]] = {}
+        if pit_stops_data and pit_stops_data.get("pit_stops"):
+            for pit in pit_stops_data["pit_stops"]:
+                driver_id = pit.get("driver_id")
+                if driver_id is not None:
+                    if driver_id not in pit_stops_by_driver:
+                        pit_stops_by_driver[driver_id] = []
+                    pit_stops_by_driver[driver_id].append(pit)
+
+        # Process each lap time
+        for lap_data in lap_times_data.get("lap_times", []):
+            driver_id = lap_data.get("driver_id")
+            lap_number = lap_data.get("lap_number")
+
+            if not driver_id or not lap_number:
+                continue
+
+            # Calculate pit stop metrics for this driver up to this lap
+            pit_stop_count = 0
+            total_pit_time = 0.0
+            driver_pits = pit_stops_by_driver.get(driver_id, [])
+            for pit in driver_pits:
+                if pit.get("lap_number", 0) <= lap_number:
+                    pit_stop_count += 1
+                    total_pit_time += pit.get("pit_duration", 0.0)
+
+            # Create processed data point
+            processed_point = ProcessedDataPoint(
+                timestamp=datetime.fromisoformat(
+                    lap_data.get("timestamp", "").replace("Z", "+00:00")
+                ),
+                driver_id=driver_id,
+                lap_number=lap_number,
+                lap_time=lap_data.get("lap_time"),
+                sector_1_time=lap_data.get("sector_1_time"),
+                sector_2_time=lap_data.get("sector_2_time"),
+                sector_3_time=lap_data.get("sector_3_time"),
+                tire_compound=lap_data.get("tire_compound"),
+                fuel_load=lap_data.get("fuel_load"),
+                grid_position=grid_positions.get(driver_id),
+                current_position=1,  # TODO: Calculate from race data
+                air_temperature=(
+                    weather_data.get("avg_air_temperature") if weather_data else None
+                ),
+                track_temperature=(
+                    weather_data.get("avg_track_temperature") if weather_data else None
+                ),
+                humidity=weather_data.get("avg_humidity") if weather_data else None,
+                weather_condition=(
+                    weather_data.get("weather_condition") if weather_data else "unknown"
+                ),
+                pit_stop_count=pit_stop_count,
+                total_pit_time=total_pit_time,
+                lap_status=lap_data.get("lap_status", "valid"),
+            )
+
+            processed_points.append(processed_point)
+
+        # Sort by timestamp and lap number
+        processed_points.sort(key=lambda x: (x.timestamp, x.lap_number))
+
+        return processed_points
 
     def _prepare_features(
         self, request: SimulationRequest, historical_data: dict
