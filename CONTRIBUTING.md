@@ -254,4 +254,4 @@ Contributors will be recognized in:
 - **Release notes** for significant contributions
 - **GitHub contributors** page
 
-Thank you for contributing to the F1 What-If Simulator API! 🏎️ 
+Thank you for contributing to the F1 What-If Simulator API! 🏎️

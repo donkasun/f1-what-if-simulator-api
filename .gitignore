@@ -300,4 +300,4 @@ yarn-error.log*
 htmlcov/
 .coverage
 coverage.xml
-*.cover 
+*.cover

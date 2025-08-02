@@ -57,7 +57,7 @@ Follow these instructions to get a copy of the project up and running on your lo
    ```bash
    cp env.example .env
    ```
-   
+
    No changes are needed in the `.env` file to run the application locally with default settings.
 
 ### Running the Development Server
