@@ -211,7 +211,7 @@ class FeatureEngineeringService:
                     imputer = SimpleImputer(strategy="mean")
 
                 # Reshape to 2D array for sklearn
-                values = df_imputed[col].values.reshape(-1, 1)
+                values = df_imputed[col].to_numpy().reshape(-1, 1)
                 df_imputed[col] = imputer.fit_transform(values).flatten()
                 self.imputers[col] = imputer
 
@@ -227,7 +227,7 @@ class FeatureEngineeringService:
                 # Use most frequent value for categorical features
                 imputer = SimpleImputer(strategy="most_frequent")
                 # Reshape to 2D array for sklearn
-                values = df_imputed[col].values.reshape(-1, 1)
+                values = df_imputed[col].to_numpy().reshape(-1, 1)
                 imputed_values = imputer.fit_transform(values).flatten()
                 # Convert back to string type if needed
                 if col == "tire_compound" or col == "weather_condition":
@@ -253,7 +253,7 @@ class FeatureEngineeringService:
             ):
                 # Use median for lap times
                 imputer = SimpleImputer(strategy="median")
-                values = df_imputed[col].values.reshape(-1, 1)
+                values = df_imputed[col].to_numpy().reshape(-1, 1)
                 df_imputed[col] = imputer.fit_transform(values).flatten()
                 self.imputers[col] = imputer
 
@@ -272,7 +272,7 @@ class FeatureEngineeringService:
         for col, imputer in self.imputers.items():
             if col in df_imputed.columns and df_imputed[col].isnull().any():
                 # Reshape to 2D array for sklearn
-                values = df_imputed[col].values.reshape(-1, 1)
+                values = df_imputed[col].to_numpy().reshape(-1, 1)
                 df_imputed[col] = imputer.transform(values).flatten()
 
         return df_imputed
@@ -517,7 +517,7 @@ class FeatureEngineeringService:
             if col in df_scaled.columns:
                 scaler = StandardScaler()
                 # Reshape to 2D array for sklearn
-                values = df_scaled[col].values.reshape(-1, 1)
+                values = df_scaled[col].to_numpy().reshape(-1, 1)
                 df_scaled[col] = scaler.fit_transform(values).flatten()
                 self.scalers[col] = scaler
 
@@ -532,7 +532,7 @@ class FeatureEngineeringService:
         for col, scaler in self.scalers.items():
             if col in df_scaled.columns:
                 # Reshape to 2D array for sklearn
-                values = df_scaled[col].values.reshape(-1, 1)
+                values = df_scaled[col].to_numpy().reshape(-1, 1)
                 df_scaled[col] = scaler.transform(values).flatten()
 
         return df_scaled
@@ -547,8 +547,8 @@ class FeatureEngineeringService:
             )
 
         # Prepare feature matrix and target vector
-        X = df[self.feature_columns].values
-        y = df[target_column].values
+        X = df[self.feature_columns].to_numpy()
+        y = df[target_column].to_numpy()
 
         # Remove rows with NaN values
         mask = ~(np.isnan(X).any(axis=1) | np.isnan(y))
@@ -575,7 +575,7 @@ class FeatureEngineeringService:
 
     def _select_features_transform(self, df: pd.DataFrame) -> np.ndarray:
         """Select features using fitted selectors."""
-        X = df[self.feature_columns].values
+        X = df[self.feature_columns].to_numpy()
 
         # Remove rows with NaN values
         mask = ~np.isnan(X).any(axis=1)
@@ -584,10 +584,11 @@ class FeatureEngineeringService:
         # Use the first available selector (assuming single target)
         if self.feature_selectors:
             selector = list(self.feature_selectors.values())[0]
-            X_selected = selector.transform(X)
+            X_selected: np.ndarray = selector.transform(X)
             return X_selected
 
-        return X
+        result: np.ndarray = X.astype(np.float64)
+        return result
 
     def _prepare_metadata(
         self, df: pd.DataFrame, target_column: Optional[str]
