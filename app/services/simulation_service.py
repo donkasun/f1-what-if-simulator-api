@@ -1,5 +1,8 @@
 """
-Simulation service for F1 What-If Simulator business logic.
+Simulation service for F1 What-If Simulator.
+
+This module provides business logic for running F1 simulations,
+including ML model integration and result caching.
 """
 
 import time
@@ -10,21 +13,20 @@ from typing import List
 import structlog
 from async_lru import alru_cache
 
+from app.core.exceptions import DriverNotFoundError, InvalidSimulationParametersError
+from app.external.openf1_client import OpenF1Client
+from app.models.model_loader import ModelLoader
 from app.api.v1.schemas import (
     DriverResponse,
     SimulationRequest,
     SimulationResponse,
     TrackResponse,
 )
-from app.core.exceptions import (
-    DriverNotFoundError,
-    InvalidSimulationParametersError,
-    OpenF1APIError,
-)
-from app.external.openf1_client import OpenF1Client
-from app.models.model_loader import ModelLoader
 
 logger = structlog.get_logger()
+
+# Global cache for simulation results - persists across service instances
+_simulation_cache = {}
 
 
 class SimulationService:
@@ -34,7 +36,8 @@ class SimulationService:
         """Initialize the simulation service with dependencies."""
         self.openf1_client = OpenF1Client()
         self.model_loader = ModelLoader()
-        self._simulation_cache = {}  # In-memory cache for simulation results
+        # Use the global cache instead of instance-level cache
+        self._simulation_cache = _simulation_cache
     
     @alru_cache(maxsize=100)
     async def get_drivers(self, season: int) -> List[DriverResponse]:
@@ -257,6 +260,41 @@ class SimulationService:
             raise InvalidSimulationParametersError(f"Simulation {simulation_id} not found")
         
         return self._simulation_cache[simulation_id]
+    
+    def get_cache_stats(self) -> dict:
+        """
+        Get cache statistics for debugging and monitoring.
+        
+        Returns:
+            Dictionary with cache statistics
+        """
+        return {
+            "cache_size": len(self._simulation_cache),
+            "cached_simulations": list(self._simulation_cache.keys()),
+            "cache_hits": getattr(self, '_cache_hits', 0),
+            "cache_misses": getattr(self, '_cache_misses', 0)
+        }
+    
+    def clear_cache(self) -> None:
+        """Clear all cached simulation results."""
+        self._simulation_cache.clear()
+        logger.info("Simulation cache cleared")
+    
+    def remove_from_cache(self, simulation_id: str) -> bool:
+        """
+        Remove a specific simulation from cache.
+        
+        Args:
+            simulation_id: Simulation ID to remove
+            
+        Returns:
+            True if removed, False if not found
+        """
+        if simulation_id in self._simulation_cache:
+            del self._simulation_cache[simulation_id]
+            logger.info("Removed simulation from cache", simulation_id=simulation_id)
+            return True
+        return False
     
     def _prepare_features(self, request: SimulationRequest, historical_data: dict) -> List[float]:
         """
