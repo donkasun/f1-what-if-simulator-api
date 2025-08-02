@@ -17,6 +17,9 @@ from app.api.v1.schemas import (
     WeatherSummaryResponse,
     StartingGridResponse,
     GridSummaryResponse,
+    LapTimesResponse,
+    PitStopsResponse,
+    DriverPerformanceSummaryResponse,
 )
 from app.core.exceptions import InvalidSimulationParametersError
 from app.services.simulation_service import SimulationService
@@ -258,3 +261,67 @@ async def get_grid_summary(
             exc_info=True,
         )
         raise HTTPException(status_code=500, detail="Failed to fetch grid summary")
+
+
+@router.get("/lap-times/{session_key}", response_model=LapTimesResponse)
+async def get_lap_times(
+    session_key: int,
+    simulation_service: SimulationService = Depends(get_simulation_service),
+) -> LapTimesResponse:
+    """Get lap times data for a specific session."""
+    logger.info("Fetching lap times", session_key=session_key)
+    try:
+        lap_times_data = await simulation_service.get_lap_times(session_key)
+        return lap_times_data
+    except Exception as e:
+        logger.error(
+            "Failed to fetch lap times",
+            session_key=session_key,
+            error=str(e),
+            exc_info=True,
+        )
+        raise HTTPException(status_code=500, detail="Failed to fetch lap times")
+
+
+@router.get("/pit-stops/{session_key}", response_model=PitStopsResponse)
+async def get_pit_stops(
+    session_key: int,
+    simulation_service: SimulationService = Depends(get_simulation_service),
+) -> PitStopsResponse:
+    """Get pit stop data for a specific session."""
+    logger.info("Fetching pit stops", session_key=session_key)
+    try:
+        pit_stops_data = await simulation_service.get_pit_stops(session_key)
+        return pit_stops_data
+    except Exception as e:
+        logger.error(
+            "Failed to fetch pit stops",
+            session_key=session_key,
+            error=str(e),
+            exc_info=True,
+        )
+        raise HTTPException(status_code=500, detail="Failed to fetch pit stops")
+
+
+@router.get(
+    "/driver-performance/{session_key}", response_model=DriverPerformanceSummaryResponse
+)
+async def get_driver_performance(
+    session_key: int,
+    simulation_service: SimulationService = Depends(get_simulation_service),
+) -> DriverPerformanceSummaryResponse:
+    """Get driver performance summary for a specific session."""
+    logger.info("Fetching driver performance", session_key=session_key)
+    try:
+        performance_data = await simulation_service.get_driver_performance(session_key)
+        return performance_data
+    except Exception as e:
+        logger.error(
+            "Failed to fetch driver performance",
+            session_key=session_key,
+            error=str(e),
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=500, detail="Failed to fetch driver performance"
+        )

@@ -364,3 +364,203 @@ class GridSummaryResponse(BaseModel):
             }
         }
     }
+
+
+class LapTimeResponse(BaseModel):
+    """Response schema for individual lap time data."""
+
+    lap_number: int = Field(..., description="Lap number")
+    driver_id: int = Field(..., description="Driver identifier")
+    driver_name: str = Field(..., description="Driver's full name")
+    driver_code: str = Field(..., description="Driver's 3-letter code")
+    team_name: str = Field(..., description="Team name")
+    lap_time: Optional[float] = Field(None, description="Lap time in seconds")
+    sector_1_time: Optional[float] = Field(None, description="Sector 1 time in seconds")
+    sector_2_time: Optional[float] = Field(None, description="Sector 2 time in seconds")
+    sector_3_time: Optional[float] = Field(None, description="Sector 3 time in seconds")
+    tire_compound: Optional[str] = Field(None, description="Tire compound used")
+    fuel_load: Optional[float] = Field(None, description="Fuel load in kg")
+    lap_status: str = Field(..., description="Lap status (valid/invalid/dnf)")
+    timestamp: datetime = Field(..., description="Lap timestamp")
+
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "lap_number": 15,
+                "driver_id": 1,
+                "driver_name": "Max Verstappen",
+                "driver_code": "VER",
+                "team_name": "Red Bull Racing",
+                "lap_time": 78.456,
+                "sector_1_time": 25.123,
+                "sector_2_time": 26.789,
+                "sector_3_time": 26.544,
+                "tire_compound": "soft",
+                "fuel_load": 45.2,
+                "lap_status": "valid",
+                "timestamp": "2024-03-02T15:30:00Z",
+            }
+        }
+    }
+
+
+class PitStopResponse(BaseModel):
+    """Response schema for individual pit stop data."""
+
+    pit_stop_number: int = Field(..., description="Pit stop number in the race")
+    driver_id: int = Field(..., description="Driver identifier")
+    driver_name: str = Field(..., description="Driver's full name")
+    driver_code: str = Field(..., description="Driver's 3-letter code")
+    team_name: str = Field(..., description="Team name")
+    lap_number: int = Field(..., description="Lap when pit stop occurred")
+    pit_duration: float = Field(..., description="Pit stop duration in seconds")
+    tire_compound_in: str = Field(..., description="Tire compound going in")
+    tire_compound_out: str = Field(..., description="Tire compound coming out")
+    fuel_added: Optional[float] = Field(None, description="Fuel added in kg")
+    pit_reason: str = Field(..., description="Reason for pit stop")
+    timestamp: datetime = Field(..., description="Pit stop timestamp")
+
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "pit_stop_number": 1,
+                "driver_id": 1,
+                "driver_name": "Max Verstappen",
+                "driver_code": "VER",
+                "team_name": "Red Bull Racing",
+                "lap_number": 18,
+                "pit_duration": 2.8,
+                "tire_compound_in": "medium",
+                "tire_compound_out": "soft",
+                "fuel_added": 15.5,
+                "pit_reason": "tire_change",
+                "timestamp": "2024-03-02T15:45:00Z",
+            }
+        }
+    }
+
+
+class DriverPerformanceResponse(BaseModel):
+    """Response schema for driver performance metrics."""
+
+    driver_id: int = Field(..., description="Driver identifier")
+    driver_name: str = Field(..., description="Driver's full name")
+    driver_code: str = Field(..., description="Driver's 3-letter code")
+    team_name: str = Field(..., description="Team name")
+    total_laps: int = Field(..., description="Total laps completed")
+    best_lap_time: Optional[float] = Field(None, description="Best lap time in seconds")
+    avg_lap_time: Optional[float] = Field(
+        None, description="Average lap time in seconds"
+    )
+    consistency_score: float = Field(..., description="Lap consistency score (0-1)")
+    total_pit_stops: int = Field(..., description="Total number of pit stops")
+    total_pit_time: float = Field(
+        ..., description="Total time spent in pits in seconds"
+    )
+    avg_pit_time: float = Field(..., description="Average pit stop time in seconds")
+    tire_compounds_used: List[str] = Field(
+        ..., description="List of tire compounds used"
+    )
+    final_position: Optional[int] = Field(None, description="Final race position")
+    race_status: str = Field(..., description="Final race status (finished/dnf/dsq)")
+
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "driver_id": 1,
+                "driver_name": "Max Verstappen",
+                "driver_code": "VER",
+                "team_name": "Red Bull Racing",
+                "total_laps": 52,
+                "best_lap_time": 77.123,
+                "avg_lap_time": 78.456,
+                "consistency_score": 0.92,
+                "total_pit_stops": 2,
+                "total_pit_time": 5.6,
+                "avg_pit_time": 2.8,
+                "tire_compounds_used": ["soft", "medium", "soft"],
+                "final_position": 1,
+                "race_status": "finished",
+            }
+        }
+    }
+
+
+class LapTimesResponse(BaseModel):
+    """Response schema for complete lap times data."""
+
+    session_key: int = Field(..., description="Session identifier")
+    session_name: str = Field(..., description="Session name")
+    track_name: str = Field(..., description="Track name")
+    country: str = Field(..., description="Country")
+    year: int = Field(..., description="Season year")
+    total_laps: int = Field(..., description="Total laps in the session")
+    lap_times: List[LapTimeResponse] = Field(..., description="List of lap times")
+
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "session_key": 9472,
+                "session_name": "2024 Bahrain Grand Prix",
+                "track_name": "Bahrain International Circuit",
+                "country": "Bahrain",
+                "year": 2024,
+                "total_laps": 52,
+                "lap_times": [],
+            }
+        }
+    }
+
+
+class PitStopsResponse(BaseModel):
+    """Response schema for complete pit stops data."""
+
+    session_key: int = Field(..., description="Session identifier")
+    session_name: str = Field(..., description="Session name")
+    track_name: str = Field(..., description="Track name")
+    country: str = Field(..., description="Country")
+    year: int = Field(..., description="Season year")
+    total_pit_stops: int = Field(..., description="Total pit stops in the session")
+    pit_stops: List[PitStopResponse] = Field(..., description="List of pit stops")
+
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "session_key": 9472,
+                "session_name": "2024 Bahrain Grand Prix",
+                "track_name": "Bahrain International Circuit",
+                "country": "Bahrain",
+                "year": 2024,
+                "total_pit_stops": 15,
+                "pit_stops": [],
+            }
+        }
+    }
+
+
+class DriverPerformanceSummaryResponse(BaseModel):
+    """Response schema for driver performance summary."""
+
+    session_key: int = Field(..., description="Session identifier")
+    session_name: str = Field(..., description="Session name")
+    track_name: str = Field(..., description="Track name")
+    country: str = Field(..., description="Country")
+    year: int = Field(..., description="Season year")
+    total_drivers: int = Field(..., description="Total number of drivers")
+    driver_performances: List[DriverPerformanceResponse] = Field(
+        ..., description="List of driver performances"
+    )
+
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "session_key": 9472,
+                "session_name": "2024 Bahrain Grand Prix",
+                "track_name": "Bahrain International Circuit",
+                "country": "Bahrain",
+                "year": 2024,
+                "total_drivers": 20,
+                "driver_performances": [],
+            }
+        }
+    }

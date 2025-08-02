@@ -520,6 +520,415 @@ class OpenF1Client:
             "teams_represented": list(teams),
         }
 
+    @alru_cache(maxsize=100)
+    async def get_lap_times(self, session_key: int) -> List[Dict]:
+        """
+        Get lap times data for a specific session.
+
+        Args:
+            session_key: Session identifier
+
+        Returns:
+            List of lap time data
+
+        Raises:
+            OpenF1APIError: If API call fails
+        """
+        # TODO: Replace with real API call when authentication is available
+        # endpoint = "/v1/lap_times"
+        # params = {"session_key": session_key}
+        # return await self._make_request("GET", endpoint, params=params)
+
+        # Mock data for development
+        mock_lap_times = [
+            {
+                "lap_number": 1,
+                "driver_id": 1,
+                "driver_name": "Max Verstappen",
+                "driver_code": "VER",
+                "team_name": "Red Bull Racing",
+                "lap_time": 78.456,
+                "sector_1_time": 25.123,
+                "sector_2_time": 26.789,
+                "sector_3_time": 26.544,
+                "tire_compound": "soft",
+                "fuel_load": 110.0,
+                "lap_status": "valid",
+                "timestamp": "2024-03-02T15:00:00Z",
+            },
+            {
+                "lap_number": 2,
+                "driver_id": 1,
+                "driver_name": "Max Verstappen",
+                "driver_code": "VER",
+                "team_name": "Red Bull Racing",
+                "lap_time": 77.234,
+                "sector_1_time": 24.890,
+                "sector_2_time": 26.123,
+                "sector_3_time": 26.221,
+                "tire_compound": "soft",
+                "fuel_load": 105.5,
+                "lap_status": "valid",
+                "timestamp": "2024-03-02T15:01:17Z",
+            },
+            {
+                "lap_number": 1,
+                "driver_id": 2,
+                "driver_name": "Lewis Hamilton",
+                "driver_code": "HAM",
+                "team_name": "Mercedes",
+                "lap_time": 78.789,
+                "sector_1_time": 25.456,
+                "sector_2_time": 27.123,
+                "sector_3_time": 26.210,
+                "tire_compound": "soft",
+                "fuel_load": 110.0,
+                "lap_status": "valid",
+                "timestamp": "2024-03-02T15:00:00Z",
+            },
+            {
+                "lap_number": 2,
+                "driver_id": 2,
+                "driver_name": "Lewis Hamilton",
+                "driver_code": "HAM",
+                "team_name": "Mercedes",
+                "lap_time": 77.567,
+                "sector_1_time": 25.123,
+                "sector_2_time": 26.789,
+                "sector_3_time": 25.655,
+                "tire_compound": "soft",
+                "fuel_load": 105.5,
+                "lap_status": "valid",
+                "timestamp": "2024-03-02T15:01:17Z",
+            },
+        ]
+
+        return mock_lap_times
+
+    @alru_cache(maxsize=100)
+    async def get_pit_stops(self, session_key: int) -> List[Dict]:
+        """
+        Get pit stop data for a specific session.
+
+        Args:
+            session_key: Session identifier
+
+        Returns:
+            List of pit stop data
+
+        Raises:
+            OpenF1APIError: If API call fails
+        """
+        # TODO: Replace with real API call when authentication is available
+        # endpoint = "/v1/pit_stops"
+        # params = {"session_key": session_key}
+        # return await self._make_request("GET", endpoint, params=params)
+
+        # Mock data for development
+        mock_pit_stops = [
+            {
+                "pit_stop_number": 1,
+                "driver_id": 1,
+                "driver_name": "Max Verstappen",
+                "driver_code": "VER",
+                "team_name": "Red Bull Racing",
+                "lap_number": 18,
+                "pit_duration": 2.8,
+                "tire_compound_in": "medium",
+                "tire_compound_out": "soft",
+                "fuel_added": 15.5,
+                "pit_reason": "tire_change",
+                "timestamp": "2024-03-02T15:30:00Z",
+            },
+            {
+                "pit_stop_number": 2,
+                "driver_id": 1,
+                "driver_name": "Max Verstappen",
+                "driver_code": "VER",
+                "team_name": "Red Bull Racing",
+                "lap_number": 35,
+                "pit_duration": 2.6,
+                "tire_compound_in": "hard",
+                "tire_compound_out": "medium",
+                "fuel_added": 12.0,
+                "pit_reason": "tire_change",
+                "timestamp": "2024-03-02T15:55:00Z",
+            },
+            {
+                "pit_stop_number": 1,
+                "driver_id": 2,
+                "driver_name": "Lewis Hamilton",
+                "driver_code": "HAM",
+                "team_name": "Mercedes",
+                "lap_number": 20,
+                "pit_duration": 3.1,
+                "tire_compound_in": "medium",
+                "tire_compound_out": "soft",
+                "fuel_added": 18.0,
+                "pit_reason": "tire_change",
+                "timestamp": "2024-03-02T15:33:00Z",
+            },
+            {
+                "pit_stop_number": 2,
+                "driver_id": 2,
+                "driver_name": "Lewis Hamilton",
+                "driver_code": "HAM",
+                "team_name": "Mercedes",
+                "lap_number": 38,
+                "pit_duration": 2.9,
+                "tire_compound_in": "hard",
+                "tire_compound_out": "medium",
+                "fuel_added": 14.5,
+                "pit_reason": "tire_change",
+                "timestamp": "2024-03-02T15:58:00Z",
+            },
+        ]
+
+        return mock_pit_stops
+
+    async def get_session_lap_times_summary(self, session_key: int) -> Dict:
+        """
+        Get lap times summary for a specific session.
+
+        Args:
+            session_key: Session identifier
+
+        Returns:
+            Lap times summary with session info and lap times
+
+        Raises:
+            OpenF1APIError: If API call fails
+        """
+        lap_times = await self.get_lap_times(session_key)
+        sessions = await self.get_sessions(2024)  # TODO: Get year from session_key
+
+        # Find session info
+        session_info = None
+        for session in sessions:
+            if session.get("session_key") == session_key:
+                session_info = session
+                break
+
+        if not session_info:
+            return {
+                "session_key": session_key,
+                "session_name": "Unknown Session",
+                "track_name": "Unknown Track",
+                "country": "Unknown",
+                "year": 2024,
+                "total_laps": 0,
+                "lap_times": [],
+            }
+
+        return {
+            "session_key": session_key,
+            "session_name": session_info.get("session_name", "Unknown Session"),
+            "track_name": session_info.get("location", "Unknown Track"),
+            "country": session_info.get("country_name", "Unknown"),
+            "year": session_info.get("year", 2024),
+            "total_laps": len(lap_times),
+            "lap_times": lap_times,
+        }
+
+    async def get_session_pit_stops_summary(self, session_key: int) -> Dict:
+        """
+        Get pit stops summary for a specific session.
+
+        Args:
+            session_key: Session identifier
+
+        Returns:
+            Pit stops summary with session info and pit stops
+
+        Raises:
+            OpenF1APIError: If API call fails
+        """
+        pit_stops = await self.get_pit_stops(session_key)
+        sessions = await self.get_sessions(2024)  # TODO: Get year from session_key
+
+        # Find session info
+        session_info = None
+        for session in sessions:
+            if session.get("session_key") == session_key:
+                session_info = session
+                break
+
+        if not session_info:
+            return {
+                "session_key": session_key,
+                "session_name": "Unknown Session",
+                "track_name": "Unknown Track",
+                "country": "Unknown",
+                "year": 2024,
+                "total_pit_stops": 0,
+                "pit_stops": [],
+            }
+
+        return {
+            "session_key": session_key,
+            "session_name": session_info.get("session_name", "Unknown Session"),
+            "track_name": session_info.get("location", "Unknown Track"),
+            "country": session_info.get("country_name", "Unknown"),
+            "year": session_info.get("year", 2024),
+            "total_pit_stops": len(pit_stops),
+            "pit_stops": pit_stops,
+        }
+
+    async def get_session_driver_performance_summary(self, session_key: int) -> Dict:
+        """
+        Get driver performance summary for a specific session.
+
+        Args:
+            session_key: Session identifier
+
+        Returns:
+            Driver performance summary with session info and driver performances
+
+        Raises:
+            OpenF1APIError: If API call fails
+        """
+        lap_times = await self.get_lap_times(session_key)
+        pit_stops = await self.get_pit_stops(session_key)
+        sessions = await self.get_sessions(2024)  # TODO: Get year from session_key
+
+        # Find session info
+        session_info = None
+        for session in sessions:
+            if session.get("session_key") == session_key:
+                session_info = session
+                break
+
+        if not session_info:
+            return {
+                "session_key": session_key,
+                "session_name": "Unknown Session",
+                "track_name": "Unknown Track",
+                "country": "Unknown",
+                "year": 2024,
+                "total_drivers": 0,
+                "driver_performances": [],
+            }
+
+        # Process lap times and pit stops to create driver performance data
+        driver_performances = self._process_driver_performances(lap_times, pit_stops)
+
+        return {
+            "session_key": session_key,
+            "session_name": session_info.get("session_name", "Unknown Session"),
+            "track_name": session_info.get("location", "Unknown Track"),
+            "country": session_info.get("country_name", "Unknown"),
+            "year": session_info.get("year", 2024),
+            "total_drivers": len(driver_performances),
+            "driver_performances": driver_performances,
+        }
+
+    def _process_driver_performances(
+        self, lap_times: List[Dict], pit_stops: List[Dict]
+    ) -> List[Dict]:
+        """
+        Process lap times and pit stops to create driver performance data.
+
+        Args:
+            lap_times: List of lap time data
+            pit_stops: List of pit stop data
+
+        Returns:
+            List of driver performance data
+        """
+        # Group lap times by driver
+        driver_laps: Dict[int, List[Dict]] = {}
+        for lap in lap_times:
+            driver_id = lap.get("driver_id")
+            if driver_id is not None:
+                if driver_id not in driver_laps:
+                    driver_laps[driver_id] = []
+                driver_laps[driver_id].append(lap)
+
+        # Group pit stops by driver
+        driver_pits: Dict[int, List[Dict]] = {}
+        for pit in pit_stops:
+            driver_id = pit.get("driver_id")
+            if driver_id is not None:
+                if driver_id not in driver_pits:
+                    driver_pits[driver_id] = []
+                driver_pits[driver_id].append(pit)
+
+        # Create performance data for each driver
+        performances = []
+        for driver_id, laps in driver_laps.items():
+            if not laps:
+                continue
+
+            # Get driver info from first lap
+            first_lap = laps[0]
+            driver_name = first_lap.get("driver_name", "Unknown Driver")
+            driver_code = first_lap.get("driver_code", "UNK")
+            team_name = first_lap.get("team_name", "Unknown Team")
+
+            # Calculate lap time statistics
+            valid_lap_times = [
+                float(lap["lap_time"])
+                for lap in laps
+                if lap.get("lap_time") and lap.get("lap_status") == "valid"
+            ]
+
+            if not valid_lap_times:
+                continue
+
+            best_lap_time = min(valid_lap_times)
+            avg_lap_time = sum(valid_lap_times) / len(valid_lap_times)
+
+            # Calculate consistency score
+            variance = sum((t - avg_lap_time) ** 2 for t in valid_lap_times) / len(
+                valid_lap_times
+            )
+            std_dev = variance**0.5
+            consistency_score = max(0.0, 1.0 - (std_dev / avg_lap_time))
+
+            # Get pit stop data
+            driver_pit_stops = driver_pits.get(driver_id, [])
+            total_pit_stops = len(driver_pit_stops)
+            total_pit_time = sum(pit.get("pit_duration", 0) for pit in driver_pit_stops)
+            avg_pit_time = (
+                total_pit_time / total_pit_stops if total_pit_stops > 0 else 0.0
+            )
+
+            # Get tire compounds used
+            tire_compounds = list(
+                set(
+                    pit.get("tire_compound_in")
+                    for pit in driver_pit_stops
+                    if pit.get("tire_compound_in")
+                )
+            )
+
+            # Determine final position (mock for now)
+            final_position = (
+                1 if driver_id == 1 else 2
+            )  # TODO: Calculate from actual race data
+            race_status = "finished"  # TODO: Get from actual race data
+
+            performance = {
+                "driver_id": driver_id,
+                "driver_name": driver_name,
+                "driver_code": driver_code,
+                "team_name": team_name,
+                "total_laps": len(laps),
+                "best_lap_time": best_lap_time,
+                "avg_lap_time": avg_lap_time,
+                "consistency_score": consistency_score,
+                "total_pit_stops": total_pit_stops,
+                "total_pit_time": total_pit_time,
+                "avg_pit_time": avg_pit_time,
+                "tire_compounds_used": tire_compounds,
+                "final_position": final_position,
+                "race_status": race_status,
+            }
+
+            performances.append(performance)
+
+        return performances
+
     async def _make_request(
         self, method: str, endpoint: str, params: Optional[Dict] = None
     ) -> List[Dict]:  # type: ignore
