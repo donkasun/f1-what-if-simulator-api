@@ -24,6 +24,9 @@ from app.api.v1.schemas import (
     SessionResponse,
     WeatherDataResponse,
     WeatherSummaryResponse,
+    StartingGridResponse,
+    GridPositionResponse,
+    GridSummaryResponse,
 )
 
 logger = structlog.get_logger()
@@ -226,6 +229,109 @@ class SimulationService:
                 avg_wind_speed=weather_summary["avg_wind_speed"],
                 total_rainfall=weather_summary["total_rainfall"],
                 data_points=weather_summary["data_points"],
+            )
+
+    async def get_starting_grid(self, session_key: int) -> StartingGridResponse:
+        """
+        Get the starting grid for a specific session.
+
+        Args:
+            session_key: Session identifier
+
+        Returns:
+            Starting grid data with all positions
+
+        Raises:
+            OpenF1APIError: If API call fails
+        """
+        logger.info("Fetching starting grid", session_key=session_key)
+
+        async with self.openf1_client as client:
+            grid_data = await client.get_starting_grid(session_key)
+            grid_summary = await client.get_session_grid_summary(session_key)
+
+            # Get session info for additional context
+            sessions = await client.get_sessions(grid_summary.get("year", 2024))
+            session_info = None
+            for session in sessions:
+                if session.get("session_key") == session_key:
+                    session_info = session
+                    break
+
+            grid_positions = []
+            for position_data in grid_data:
+                grid_positions.append(
+                    GridPositionResponse(
+                        position=position_data.get("position"),
+                        driver_id=position_data.get("driver_id"),
+                        driver_name=position_data.get("driver_name"),
+                        driver_code=position_data.get("driver_code"),
+                        team_name=position_data.get("team_name"),
+                        qualifying_time=position_data.get("qualifying_time"),
+                        qualifying_gap=position_data.get("qualifying_gap"),
+                        qualifying_laps=position_data.get("qualifying_laps"),
+                    )
+                )
+
+            return StartingGridResponse(
+                session_key=session_key,
+                session_name=(
+                    session_info.get("session_name")
+                    if session_info
+                    else f"Session {session_key}"
+                ),
+                track_name=(
+                    session_info.get("circuit_short_name")
+                    if session_info
+                    else "Unknown Track"
+                ),
+                country=session_info.get("country_name") if session_info else "Unknown",
+                year=session_info.get("year") if session_info else 2024,
+                total_drivers=len(grid_positions),
+                grid_positions=grid_positions,
+            )
+
+    async def get_grid_summary(self, session_key: int) -> GridSummaryResponse:
+        """
+        Get grid summary statistics for a specific session.
+
+        Args:
+            session_key: Session identifier
+
+        Returns:
+            Grid summary with statistics
+
+        Raises:
+            OpenF1APIError: If API call fails
+        """
+        logger.info("Fetching grid summary", session_key=session_key)
+
+        async with self.openf1_client as client:
+            grid_summary = await client.get_session_grid_summary(session_key)
+
+            # Convert pole position data to GridPositionResponse if available
+            pole_position = None
+            if grid_summary.get("pole_position"):
+                pole_data = grid_summary["pole_position"]
+                pole_position = GridPositionResponse(
+                    position=pole_data.get("position"),
+                    driver_id=pole_data.get("driver_id"),
+                    driver_name=pole_data.get("driver_name"),
+                    driver_code=pole_data.get("driver_code"),
+                    team_name=pole_data.get("team_name"),
+                    qualifying_time=pole_data.get("qualifying_time"),
+                    qualifying_gap=pole_data.get("qualifying_gap"),
+                    qualifying_laps=pole_data.get("qualifying_laps"),
+                )
+
+            return GridSummaryResponse(
+                session_key=session_key,
+                pole_position=pole_position,
+                fastest_qualifying_time=grid_summary.get("fastest_qualifying_time"),
+                slowest_qualifying_time=grid_summary.get("slowest_qualifying_time"),
+                average_qualifying_time=grid_summary.get("average_qualifying_time"),
+                time_gap_pole_to_last=grid_summary.get("time_gap_pole_to_last"),
+                teams_represented=grid_summary.get("teams_represented", []),
             )
 
     async def run_simulation(self, request: SimulationRequest) -> SimulationResponse:

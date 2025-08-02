@@ -7,6 +7,12 @@ from fastapi.testclient import TestClient
 from unittest.mock import AsyncMock, patch
 from app.main import app
 from app.core.exceptions import InvalidSimulationParametersError
+from app.api.v1.schemas import (
+    SimulationResponse,
+    StartingGridResponse,
+    GridPositionResponse,
+    GridSummaryResponse,
+)
 
 client = TestClient(app)
 
@@ -200,7 +206,6 @@ class TestSimulationEndpoints:
     @pytest.mark.asyncio
     async def test_run_simulation_success(self):
         """Test successful simulation execution."""
-        from app.api.v1.schemas import SimulationResponse
         from datetime import datetime
 
         mock_result = SimulationResponse(
@@ -255,7 +260,6 @@ class TestSimulationEndpoints:
     @pytest.mark.asyncio
     async def test_get_simulation_result_success(self):
         """Test successful retrieval of simulation result."""
-        from app.api.v1.schemas import SimulationResponse
         from datetime import datetime
 
         mock_result = SimulationResponse(
@@ -299,10 +303,169 @@ class TestHealthEndpoint:
     """Test cases for health check endpoint."""
 
     def test_health_check(self):
-        """Test health check endpoint."""
+        """Test health check endpoint returns correct response."""
         response = client.get("/api/v1/health")
-
         assert response.status_code == 200
         data = response.json()
         assert data["status"] == "healthy"
         assert data["service"] == "f1-what-if-simulator"
+
+
+class TestStartingGridEndpoint:
+    """Test cases for starting grid endpoint."""
+
+    @patch("app.api.v1.endpoints.SimulationService")
+    def test_get_starting_grid_success(self, mock_service_class):
+        """Test successful starting grid retrieval."""
+        mock_service = AsyncMock()
+        mock_service_class.return_value = mock_service
+
+        # Mock grid data
+        mock_grid_positions = [
+            GridPositionResponse(
+                position=1,
+                driver_id=1,
+                driver_name="Max Verstappen",
+                driver_code="VER",
+                team_name="Red Bull Racing",
+                qualifying_time=78.241,
+                qualifying_gap=0.0,
+                qualifying_laps=3,
+            ),
+            GridPositionResponse(
+                position=2,
+                driver_id=2,
+                driver_name="Lewis Hamilton",
+                driver_code="HAM",
+                team_name="Mercedes",
+                qualifying_time=78.456,
+                qualifying_gap=0.215,
+                qualifying_laps=3,
+            ),
+        ]
+
+        mock_grid = StartingGridResponse(
+            session_key=12345,
+            session_name="2024 Bahrain Grand Prix",
+            track_name="Bahrain International Circuit",
+            country="Bahrain",
+            year=2024,
+            total_drivers=2,
+            grid_positions=mock_grid_positions,
+        )
+
+        mock_service.get_starting_grid.return_value = mock_grid
+
+        response = client.get("/api/v1/grid/12345")
+        assert response.status_code == 200
+        data = response.json()
+
+        assert data["session_key"] == 12345
+        assert data["session_name"] == "2024 Bahrain Grand Prix"
+        assert data["track_name"] == "Bahrain International Circuit"
+        assert data["country"] == "Bahrain"
+        assert data["year"] == 2024
+        assert data["total_drivers"] == 2
+        assert len(data["grid_positions"]) == 2
+
+        # Verify first position
+        first_pos = data["grid_positions"][0]
+        assert first_pos["position"] == 1
+        assert first_pos["driver_name"] == "Max Verstappen"
+        assert first_pos["driver_code"] == "VER"
+        assert first_pos["team_name"] == "Red Bull Racing"
+        assert first_pos["qualifying_time"] == 78.241
+
+    @patch("app.api.v1.endpoints.SimulationService")
+    def test_get_starting_grid_invalid_session_key(self, mock_service_class):
+        """Test starting grid with invalid session key."""
+        mock_service = AsyncMock()
+        mock_service_class.return_value = mock_service
+
+        response = client.get("/api/v1/grid/invalid")
+        assert response.status_code == 422  # Validation error
+
+    @patch("app.api.v1.endpoints.SimulationService")
+    def test_get_starting_grid_service_error(self, mock_service_class):
+        """Test starting grid when service raises an error."""
+        mock_service = AsyncMock()
+        mock_service_class.return_value = mock_service
+        mock_service.get_starting_grid.side_effect = Exception("Service error")
+
+        response = client.get("/api/v1/grid/12345")
+        assert response.status_code == 500
+        data = response.json()
+        assert "Failed to fetch starting grid" in data["detail"]
+
+
+class TestGridSummaryEndpoint:
+    """Test cases for grid summary endpoint."""
+
+    @patch("app.api.v1.endpoints.SimulationService")
+    def test_get_grid_summary_success(self, mock_service_class):
+        """Test successful grid summary retrieval."""
+        mock_service = AsyncMock()
+        mock_service_class.return_value = mock_service
+
+        # Mock pole position
+        mock_pole_position = GridPositionResponse(
+            position=1,
+            driver_id=1,
+            driver_name="Max Verstappen",
+            driver_code="VER",
+            team_name="Red Bull Racing",
+            qualifying_time=78.241,
+            qualifying_gap=0.0,
+            qualifying_laps=3,
+        )
+
+        mock_summary = GridSummaryResponse(
+            session_key=12345,
+            pole_position=mock_pole_position,
+            fastest_qualifying_time=78.241,
+            slowest_qualifying_time=82.156,
+            average_qualifying_time=80.198,
+            time_gap_pole_to_last=3.915,
+            teams_represented=["Red Bull Racing", "Mercedes", "Ferrari"],
+        )
+
+        mock_service.get_grid_summary.return_value = mock_summary
+
+        response = client.get("/api/v1/grid/12345/summary")
+        assert response.status_code == 200
+        data = response.json()
+
+        assert data["session_key"] == 12345
+        assert data["fastest_qualifying_time"] == 78.241
+        assert data["slowest_qualifying_time"] == 82.156
+        assert data["average_qualifying_time"] == 80.198
+        assert data["time_gap_pole_to_last"] == 3.915
+        assert data["teams_represented"] == ["Red Bull Racing", "Mercedes", "Ferrari"]
+
+        # Verify pole position
+        pole_pos = data["pole_position"]
+        assert pole_pos["position"] == 1
+        assert pole_pos["driver_name"] == "Max Verstappen"
+        assert pole_pos["driver_code"] == "VER"
+        assert pole_pos["team_name"] == "Red Bull Racing"
+
+    @patch("app.api.v1.endpoints.SimulationService")
+    def test_get_grid_summary_invalid_session_key(self, mock_service_class):
+        """Test grid summary with invalid session key."""
+        mock_service = AsyncMock()
+        mock_service_class.return_value = mock_service
+
+        response = client.get("/api/v1/grid/invalid/summary")
+        assert response.status_code == 422  # Validation error
+
+    @patch("app.api.v1.endpoints.SimulationService")
+    def test_get_grid_summary_service_error(self, mock_service_class):
+        """Test grid summary when service raises an error."""
+        mock_service = AsyncMock()
+        mock_service_class.return_value = mock_service
+        mock_service.get_grid_summary.side_effect = Exception("Service error")
+
+        response = client.get("/api/v1/grid/12345/summary")
+        assert response.status_code == 500
+        data = response.json()
+        assert "Failed to fetch grid summary" in data["detail"]
