@@ -574,7 +574,8 @@ class SimulationService:
                 processing_time_ms=processing_time_ms,
             )
 
-            return result
+            response: SimulationResponse = result
+            return response
 
         except (DriverNotFoundError, InvalidSimulationParametersError):
             # Re-raise business exceptions
@@ -606,7 +607,8 @@ class SimulationService:
                 f"Simulation {simulation_id} not found"
             )
 
-        return self._simulation_cache[simulation_id]
+        result: SimulationResponse = self._simulation_cache[simulation_id]
+        return result
 
     def get_cache_stats(self) -> dict:
         """
