@@ -15,6 +15,8 @@ from app.api.v1.schemas import (
     SessionResponse,
     WeatherDataResponse,
     WeatherSummaryResponse,
+    StartingGridResponse,
+    GridSummaryResponse,
 )
 from app.core.exceptions import InvalidSimulationParametersError
 from app.services.simulation_service import SimulationService
@@ -206,10 +208,8 @@ async def get_weather_summary(
     """Get weather summary for a specific session."""
     logger.info("Fetching weather summary", session_key=session_key)
     try:
-        weather_summary = await simulation_service.get_session_weather_summary(
-            session_key
-        )
-        return weather_summary
+        summary = await simulation_service.get_session_weather_summary(session_key)
+        return summary
     except Exception as e:
         logger.error(
             "Failed to fetch weather summary",
@@ -218,3 +218,43 @@ async def get_weather_summary(
             exc_info=True,
         )
         raise HTTPException(status_code=500, detail="Failed to fetch weather summary")
+
+
+@router.get("/grid/{session_key}", response_model=StartingGridResponse)
+async def get_starting_grid(
+    session_key: int,
+    simulation_service: SimulationService = Depends(get_simulation_service),
+) -> StartingGridResponse:
+    """Get starting grid for a specific session."""
+    logger.info("Fetching starting grid", session_key=session_key)
+    try:
+        grid = await simulation_service.get_starting_grid(session_key)
+        return grid
+    except Exception as e:
+        logger.error(
+            "Failed to fetch starting grid",
+            session_key=session_key,
+            error=str(e),
+            exc_info=True,
+        )
+        raise HTTPException(status_code=500, detail="Failed to fetch starting grid")
+
+
+@router.get("/grid/{session_key}/summary", response_model=GridSummaryResponse)
+async def get_grid_summary(
+    session_key: int,
+    simulation_service: SimulationService = Depends(get_simulation_service),
+) -> GridSummaryResponse:
+    """Get grid summary statistics for a specific session."""
+    logger.info("Fetching grid summary", session_key=session_key)
+    try:
+        summary = await simulation_service.get_grid_summary(session_key)
+        return summary
+    except Exception as e:
+        logger.error(
+            "Failed to fetch grid summary",
+            session_key=session_key,
+            error=str(e),
+            exc_info=True,
+        )
+        raise HTTPException(status_code=500, detail="Failed to fetch grid summary")

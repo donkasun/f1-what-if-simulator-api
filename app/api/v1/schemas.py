@@ -3,7 +3,7 @@ Pydantic schemas for API request/response validation.
 """
 
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -240,9 +240,127 @@ class ErrorResponse(BaseModel):
     model_config = {
         "json_schema_extra": {
             "example": {
-                "detail": "Driver with ID 999 not found",
-                "code": "DRIVER_NOT_FOUND",
+                "detail": "Invalid simulation parameters provided",
+                "code": "INVALID_PARAMETERS",
                 "timestamp": "2024-01-15T10:30:00Z",
+            }
+        }
+    }
+
+
+class GridPositionResponse(BaseModel):
+    """Response schema for individual grid position."""
+
+    position: int = Field(..., description="Starting grid position")
+    driver_id: int = Field(..., description="Driver identifier")
+    driver_name: str = Field(..., description="Driver's full name")
+    driver_code: str = Field(..., description="Driver's 3-letter code")
+    team_name: str = Field(..., description="Team name")
+    qualifying_time: Optional[float] = Field(
+        None, description="Qualifying time in seconds"
+    )
+    qualifying_gap: Optional[float] = Field(
+        None, description="Gap to pole position in seconds"
+    )
+    qualifying_laps: Optional[int] = Field(
+        None, description="Number of qualifying laps completed"
+    )
+
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "position": 1,
+                "driver_id": 1,
+                "driver_name": "Max Verstappen",
+                "driver_code": "VER",
+                "team_name": "Red Bull Racing",
+                "qualifying_time": 78.241,
+                "qualifying_gap": 0.0,
+                "qualifying_laps": 3,
+            }
+        }
+    }
+
+
+class StartingGridResponse(BaseModel):
+    """Response schema for complete starting grid."""
+
+    session_key: int = Field(..., description="Session identifier")
+    session_name: str = Field(..., description="Session name")
+    track_name: str = Field(..., description="Track name")
+    country: str = Field(..., description="Country")
+    year: int = Field(..., description="Season year")
+    total_drivers: int = Field(..., description="Total number of drivers")
+    grid_positions: List[GridPositionResponse] = Field(
+        ..., description="List of grid positions"
+    )
+
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "session_key": 12345,
+                "session_name": "2024 Bahrain Grand Prix",
+                "track_name": "Bahrain International Circuit",
+                "country": "Bahrain",
+                "year": 2024,
+                "total_drivers": 20,
+                "grid_positions": [
+                    {
+                        "position": 1,
+                        "driver_id": 1,
+                        "driver_name": "Max Verstappen",
+                        "driver_code": "VER",
+                        "team_name": "Red Bull Racing",
+                        "qualifying_time": 78.241,
+                        "qualifying_gap": 0.0,
+                        "qualifying_laps": 3,
+                    }
+                ],
+            }
+        }
+    }
+
+
+class GridSummaryResponse(BaseModel):
+    """Response schema for grid summary statistics."""
+
+    session_key: int = Field(..., description="Session identifier")
+    pole_position: Optional[GridPositionResponse] = Field(
+        None, description="Pole position driver"
+    )
+    fastest_qualifying_time: Optional[float] = Field(
+        None, description="Fastest qualifying time in seconds"
+    )
+    slowest_qualifying_time: Optional[float] = Field(
+        None, description="Slowest qualifying time in seconds"
+    )
+    average_qualifying_time: Optional[float] = Field(
+        None, description="Average qualifying time in seconds"
+    )
+    time_gap_pole_to_last: Optional[float] = Field(
+        None, description="Time gap from pole to last position in seconds"
+    )
+    teams_represented: List[str] = Field(..., description="List of teams in the grid")
+
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "session_key": 12345,
+                "pole_position": {
+                    "position": 1,
+                    "driver_id": 1,
+                    "driver_name": "Max Verstappen",
+                    "driver_code": "VER",
+                    "team_name": "Red Bull Racing",
+                    "qualifying_time": 78.241,
+                    "qualifying_gap": 0.0,
+                    "qualifying_laps": 3,
+                },
+                "fastest_qualifying_time": 78.241,
+                "slowest_qualifying_time": 82.156,
+                "average_qualifying_time": 80.198,
+                "time_gap_pole_to_last": 3.915,
+                "teams_represented": ["Red Bull Racing", "Mercedes", "Ferrari"],
             }
         }
     }

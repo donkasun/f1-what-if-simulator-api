@@ -124,10 +124,52 @@ class OpenF1Client:
         Raises:
             OpenF1APIError: If API call fails
         """
-        endpoint = "/v1/sessions"
-        params = {"year": season}
+        # TODO: Replace with real API call when authentication is available
+        # endpoint = "/v1/sessions"
+        # params = {"year": season}
+        # return await self._make_request("GET", endpoint, params=params)
 
-        return await self._make_request("GET", endpoint, params=params)
+        # Mock data for development
+        mock_sessions = [
+            {
+                "session_key": 12345,
+                "meeting_key": 1,
+                "location": "Bahrain International Circuit",
+                "session_type": "Race",
+                "session_name": "2024 Bahrain Grand Prix",
+                "date_start": "2024-03-02T15:00:00Z",
+                "date_end": "2024-03-02T17:00:00Z",
+                "country_name": "Bahrain",
+                "circuit_short_name": "Bahrain International Circuit",
+                "year": 2024,
+            },
+            {
+                "session_key": 12346,
+                "meeting_key": 1,
+                "location": "Bahrain International Circuit",
+                "session_type": "Qualifying",
+                "session_name": "2024 Bahrain Grand Prix Qualifying",
+                "date_start": "2024-03-01T18:00:00Z",
+                "date_end": "2024-03-01T19:00:00Z",
+                "country_name": "Bahrain",
+                "circuit_short_name": "Bahrain International Circuit",
+                "year": 2024,
+            },
+            {
+                "session_key": 12347,
+                "meeting_key": 2,
+                "location": "Jeddah Corniche Circuit",
+                "session_type": "Race",
+                "session_name": "2024 Saudi Arabian Grand Prix",
+                "date_start": "2024-03-09T17:00:00Z",
+                "date_end": "2024-03-09T19:00:00Z",
+                "country_name": "Saudi Arabia",
+                "circuit_short_name": "Jeddah Corniche Circuit",
+                "year": 2024,
+            },
+        ]
+
+        return mock_sessions
 
     @alru_cache(maxsize=100)
     async def get_weather_data(self, session_key: int) -> List[Dict]:
@@ -218,6 +260,264 @@ class OpenF1Client:
             ),
             "total_rainfall": total_rainfall,
             "data_points": len(weather_data),
+        }
+
+    @alru_cache(maxsize=100)
+    async def get_starting_grid(self, session_key: int) -> List[Dict]:
+        """
+        Get starting grid data for a specific session.
+
+        Args:
+            session_key: Session identifier
+
+        Returns:
+            List of grid position data
+
+        Raises:
+            OpenF1APIError: If API call fails
+        """
+        # TODO: Replace with real API call when authentication is available
+        # endpoint = "/v1/starting_grid"
+        # params = {"session_key": session_key}
+        # return await self._make_request("GET", endpoint, params=params)
+
+        # Mock data for development
+        mock_grid_data = [
+            {
+                "position": 1,
+                "driver_id": 1,
+                "driver_name": "Max Verstappen",
+                "driver_code": "VER",
+                "team_name": "Red Bull Racing",
+                "qualifying_time": 78.241,
+                "qualifying_gap": 0.0,
+                "qualifying_laps": 3,
+            },
+            {
+                "position": 2,
+                "driver_id": 2,
+                "driver_name": "Lewis Hamilton",
+                "driver_code": "HAM",
+                "team_name": "Mercedes",
+                "qualifying_time": 78.456,
+                "qualifying_gap": 0.215,
+                "qualifying_laps": 3,
+            },
+            {
+                "position": 3,
+                "driver_id": 3,
+                "driver_name": "Charles Leclerc",
+                "driver_code": "LEC",
+                "team_name": "Ferrari",
+                "qualifying_time": 78.567,
+                "qualifying_gap": 0.326,
+                "qualifying_laps": 3,
+            },
+            {
+                "position": 4,
+                "driver_id": 4,
+                "driver_name": "Lando Norris",
+                "driver_code": "NOR",
+                "team_name": "McLaren",
+                "qualifying_time": 78.789,
+                "qualifying_gap": 0.548,
+                "qualifying_laps": 3,
+            },
+            {
+                "position": 5,
+                "driver_id": 5,
+                "driver_name": "Carlos Sainz",
+                "driver_code": "SAI",
+                "team_name": "Ferrari",
+                "qualifying_time": 78.901,
+                "qualifying_gap": 0.660,
+                "qualifying_laps": 3,
+            },
+        ]
+
+        return mock_grid_data
+
+    @alru_cache(maxsize=50)
+    async def get_qualifying_results(self, session_key: int) -> List[Dict]:
+        """
+        Get qualifying results for a specific session.
+
+        Args:
+            session_key: Session identifier
+
+        Returns:
+            List of qualifying result data
+
+        Raises:
+            OpenF1APIError: If API call fails
+        """
+        # TODO: Replace with real API call when authentication is available
+        # endpoint = "/v1/qualifying"
+        # params = {"session_key": session_key}
+        # return await self._make_request("GET", endpoint, params=params)
+
+        # Mock data for development
+        mock_qualifying_data = [
+            {
+                "driver_id": 1,
+                "driver_name": "Max Verstappen",
+                "driver_code": "VER",
+                "team_name": "Red Bull Racing",
+                "q1_time": 78.241,
+                "q2_time": 77.856,
+                "q3_time": 77.123,
+                "gap_to_pole": 0.0,
+                "laps_completed": 3,
+            },
+            {
+                "driver_id": 2,
+                "driver_name": "Lewis Hamilton",
+                "driver_code": "HAM",
+                "team_name": "Mercedes",
+                "q1_time": 78.456,
+                "q2_time": 78.123,
+                "q3_time": 77.456,
+                "gap_to_pole": 0.333,
+                "laps_completed": 3,
+            },
+            {
+                "driver_id": 3,
+                "driver_name": "Charles Leclerc",
+                "driver_code": "LEC",
+                "team_name": "Ferrari",
+                "q1_time": 78.567,
+                "q2_time": 78.234,
+                "q3_time": 77.567,
+                "gap_to_pole": 0.444,
+                "laps_completed": 3,
+            },
+            {
+                "driver_id": 4,
+                "driver_name": "Lando Norris",
+                "driver_code": "NOR",
+                "team_name": "McLaren",
+                "q1_time": 78.789,
+                "q2_time": 78.456,
+                "q3_time": 77.789,
+                "gap_to_pole": 0.666,
+                "laps_completed": 3,
+            },
+            {
+                "driver_id": 5,
+                "driver_name": "Carlos Sainz",
+                "driver_code": "SAI",
+                "team_name": "Ferrari",
+                "q1_time": 78.901,
+                "q2_time": 78.567,
+                "q3_time": 77.901,
+                "gap_to_pole": 0.778,
+                "laps_completed": 3,
+            },
+        ]
+
+        return mock_qualifying_data
+
+    async def get_session_grid_summary(self, session_key: int) -> Dict:
+        """
+        Get grid summary statistics for a specific session.
+
+        Args:
+            session_key: Session identifier
+
+        Returns:
+            Grid summary with statistics
+
+        Raises:
+            OpenF1APIError: If API call fails
+        """
+        grid_data = await self.get_starting_grid(session_key)
+        qualifying_data = await self.get_qualifying_results(session_key)
+
+        if not grid_data:
+            return {
+                "session_key": session_key,
+                "pole_position": None,
+                "fastest_qualifying_time": None,
+                "slowest_qualifying_time": None,
+                "average_qualifying_time": None,
+                "time_gap_pole_to_last": None,
+                "teams_represented": [],
+            }
+
+        # Create a mapping of driver_id to qualifying data
+        qualifying_map = {}
+        for q in qualifying_data:
+            driver_id = q.get("driver_id")
+            if driver_id:
+                qualifying_map[driver_id] = q
+
+        # Process grid data and merge with qualifying data
+        processed_grid = []
+        teams = set()
+        qualifying_times = []
+
+        for position_data in grid_data:
+            driver_id = position_data.get("driver_id")
+            qualifying_info = qualifying_map.get(driver_id, {})
+
+            # Extract team information
+            team_name = position_data.get("team_name") or qualifying_info.get(
+                "team_name"
+            )
+            if team_name:
+                teams.add(team_name)
+
+            # Extract qualifying time
+            q_time = (
+                qualifying_info.get("q1_time")
+                or qualifying_info.get("q2_time")
+                or qualifying_info.get("q3_time")
+            )
+            if q_time:
+                try:
+                    qualifying_times.append(float(q_time))
+                except (ValueError, TypeError):
+                    pass
+
+            processed_position = {
+                "position": position_data.get("position"),
+                "driver_id": driver_id,
+                "driver_name": position_data.get("driver_name")
+                or qualifying_info.get("driver_name"),
+                "driver_code": position_data.get("driver_code")
+                or qualifying_info.get("driver_code"),
+                "team_name": team_name,
+                "qualifying_time": q_time,
+                "qualifying_gap": qualifying_info.get("gap_to_pole"),
+                "qualifying_laps": qualifying_info.get("laps_completed"),
+            }
+            processed_grid.append(processed_position)
+
+        # Calculate statistics
+        fastest_time = min(qualifying_times) if qualifying_times else None
+        slowest_time = max(qualifying_times) if qualifying_times else None
+        avg_time = (
+            sum(qualifying_times) / len(qualifying_times) if qualifying_times else None
+        )
+        time_gap = (
+            slowest_time - fastest_time if fastest_time and slowest_time else None
+        )
+
+        # Find pole position
+        pole_position = None
+        for pos in processed_grid:
+            if pos.get("position") == 1:
+                pole_position = pos
+                break
+
+        return {
+            "session_key": session_key,
+            "pole_position": pole_position,
+            "fastest_qualifying_time": fastest_time,
+            "slowest_qualifying_time": slowest_time,
+            "average_qualifying_time": avg_time,
+            "time_gap_pole_to_last": time_gap,
+            "teams_represented": list(teams),
         }
 
     async def _make_request(
