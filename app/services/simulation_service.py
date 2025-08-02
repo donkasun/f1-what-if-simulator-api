@@ -27,6 +27,12 @@ from app.api.v1.schemas import (
     StartingGridResponse,
     GridPositionResponse,
     GridSummaryResponse,
+    LapTimesResponse,
+    LapTimeResponse,
+    PitStopsResponse,
+    PitStopResponse,
+    DriverPerformanceSummaryResponse,
+    DriverPerformanceResponse,
 )
 
 logger = structlog.get_logger()
@@ -332,6 +338,149 @@ class SimulationService:
                 average_qualifying_time=grid_summary.get("average_qualifying_time"),
                 time_gap_pole_to_last=grid_summary.get("time_gap_pole_to_last"),
                 teams_represented=grid_summary.get("teams_represented", []),
+            )
+
+    async def get_lap_times(self, session_key: int) -> LapTimesResponse:
+        """
+        Get lap times data for a specific session.
+
+        Args:
+            session_key: Session identifier
+
+        Returns:
+            Lap times data with session information
+        """
+        logger.info("Fetching lap times", session_key=session_key)
+
+        async with self.openf1_client as client:
+            lap_times_summary = await client.get_session_lap_times_summary(session_key)
+
+            # Convert to response schema
+            lap_times = []
+            for lap_data in lap_times_summary.get("lap_times", []):
+                lap_time = LapTimeResponse(
+                    lap_number=lap_data.get("lap_number"),
+                    driver_id=lap_data.get("driver_id"),
+                    driver_name=lap_data.get("driver_name"),
+                    driver_code=lap_data.get("driver_code"),
+                    team_name=lap_data.get("team_name"),
+                    lap_time=lap_data.get("lap_time"),
+                    sector_1_time=lap_data.get("sector_1_time"),
+                    sector_2_time=lap_data.get("sector_2_time"),
+                    sector_3_time=lap_data.get("sector_3_time"),
+                    tire_compound=lap_data.get("tire_compound"),
+                    fuel_load=lap_data.get("fuel_load"),
+                    lap_status=lap_data.get("lap_status"),
+                    timestamp=datetime.fromisoformat(
+                        lap_data.get("timestamp").replace("Z", "+00:00")
+                    ),
+                )
+                lap_times.append(lap_time)
+
+            return LapTimesResponse(
+                session_key=lap_times_summary.get("session_key"),
+                session_name=lap_times_summary.get("session_name"),
+                track_name=lap_times_summary.get("track_name"),
+                country=lap_times_summary.get("country"),
+                year=lap_times_summary.get("year"),
+                total_laps=lap_times_summary.get("total_laps"),
+                lap_times=lap_times,
+            )
+
+    async def get_pit_stops(self, session_key: int) -> PitStopsResponse:
+        """
+        Get pit stop data for a specific session.
+
+        Args:
+            session_key: Session identifier
+
+        Returns:
+            Pit stop data with session information
+        """
+        logger.info("Fetching pit stops", session_key=session_key)
+
+        async with self.openf1_client as client:
+            pit_stops_summary = await client.get_session_pit_stops_summary(session_key)
+
+            # Convert to response schema
+            pit_stops = []
+            for pit_data in pit_stops_summary.get("pit_stops", []):
+                pit_stop = PitStopResponse(
+                    pit_stop_number=pit_data.get("pit_stop_number"),
+                    driver_id=pit_data.get("driver_id"),
+                    driver_name=pit_data.get("driver_name"),
+                    driver_code=pit_data.get("driver_code"),
+                    team_name=pit_data.get("team_name"),
+                    lap_number=pit_data.get("lap_number"),
+                    pit_duration=pit_data.get("pit_duration"),
+                    tire_compound_in=pit_data.get("tire_compound_in"),
+                    tire_compound_out=pit_data.get("tire_compound_out"),
+                    fuel_added=pit_data.get("fuel_added"),
+                    pit_reason=pit_data.get("pit_reason"),
+                    timestamp=datetime.fromisoformat(
+                        pit_data.get("timestamp").replace("Z", "+00:00")
+                    ),
+                )
+                pit_stops.append(pit_stop)
+
+            return PitStopsResponse(
+                session_key=pit_stops_summary.get("session_key"),
+                session_name=pit_stops_summary.get("session_name"),
+                track_name=pit_stops_summary.get("track_name"),
+                country=pit_stops_summary.get("country"),
+                year=pit_stops_summary.get("year"),
+                total_pit_stops=pit_stops_summary.get("total_pit_stops"),
+                pit_stops=pit_stops,
+            )
+
+    async def get_driver_performance(
+        self, session_key: int
+    ) -> DriverPerformanceSummaryResponse:
+        """
+        Get driver performance summary for a specific session.
+
+        Args:
+            session_key: Session identifier
+
+        Returns:
+            Driver performance data with session information
+        """
+        logger.info("Fetching driver performance", session_key=session_key)
+
+        async with self.openf1_client as client:
+            performance_summary = await client.get_session_driver_performance_summary(
+                session_key
+            )
+
+            # Convert to response schema
+            driver_performances = []
+            for perf_data in performance_summary.get("driver_performances", []):
+                performance = DriverPerformanceResponse(
+                    driver_id=perf_data.get("driver_id"),
+                    driver_name=perf_data.get("driver_name"),
+                    driver_code=perf_data.get("driver_code"),
+                    team_name=perf_data.get("team_name"),
+                    total_laps=perf_data.get("total_laps"),
+                    best_lap_time=perf_data.get("best_lap_time"),
+                    avg_lap_time=perf_data.get("avg_lap_time"),
+                    consistency_score=perf_data.get("consistency_score"),
+                    total_pit_stops=perf_data.get("total_pit_stops"),
+                    total_pit_time=perf_data.get("total_pit_time"),
+                    avg_pit_time=perf_data.get("avg_pit_time"),
+                    tire_compounds_used=perf_data.get("tire_compounds_used", []),
+                    final_position=perf_data.get("final_position"),
+                    race_status=perf_data.get("race_status"),
+                )
+                driver_performances.append(performance)
+
+            return DriverPerformanceSummaryResponse(
+                session_key=performance_summary.get("session_key"),
+                session_name=performance_summary.get("session_name"),
+                track_name=performance_summary.get("track_name"),
+                country=performance_summary.get("country"),
+                year=performance_summary.get("year"),
+                total_drivers=performance_summary.get("total_drivers"),
+                driver_performances=driver_performances,
             )
 
     async def run_simulation(self, request: SimulationRequest) -> SimulationResponse:
