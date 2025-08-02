@@ -1,0 +1,23 @@
+# Production Dependencies
+fastapi
+uvicorn[standard]
+python-dotenv
+pydantic
+pydantic-settings
+structlog
+httpx
+joblib
+scikit-learn
+lightgbm
+pandas
+async-lru
+
+# Development Dependencies
+pytest
+pytest-asyncio
+pytest-cov
+black
+ruff
+mypy
+jupyter
+pre-commit
