@@ -1275,8 +1275,6 @@ class SimulationService:
             encoding_type=request.encoding_type,
         )
 
-        start_time = time.time()
-
         # Process session data to get the categorical feature
         data_request = DataProcessingRequest(session_key=request.session_key)
         processed_response = await self.process_session_data(data_request)
