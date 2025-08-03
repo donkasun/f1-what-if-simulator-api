@@ -1155,24 +1155,44 @@ class SimulationService:
         """
         Prepare features for ML model prediction.
 
+        The trained model expects 4 features: [lap_number, driver_number, i2_speed, st_speed]
+        We'll map available simulation data to these expected features.
+
         Args:
             request: Simulation request
             historical_data: Historical performance data
 
         Returns:
-            Feature vector for prediction
+            Feature vector for prediction (4 features)
         """
-        # This is a simplified feature preparation
-        # In a real implementation, this would be much more sophisticated
+        # Map simulation data to trained model's expected features
+        # Our trained model expects: [lap_number, driver_number, i2_speed, st_speed]
+
+        # Use a reasonable lap number for simulation (middle of race)
+        lap_number = 25  # Assume mid-race for simulation
+
+        # Use driver_id as driver_number
+        driver_number = request.driver_id
+
+        # Estimate speeds based on historical data and track characteristics
+        # These are rough estimates since we don't have real speed trap data during simulation
+        base_i2_speed = 240.0  # Reasonable intermediate speed baseline
+        base_st_speed = 300.0  # Reasonable speed trap baseline
+
+        # Adjust speeds based on historical performance
+        performance_factor = historical_data.get("consistency_score", 0.85)
+        i2_speed = base_i2_speed * (
+            0.9 + 0.2 * performance_factor
+        )  # Scale based on performance
+        st_speed = base_st_speed * (
+            0.9 + 0.2 * performance_factor
+        )  # Scale based on performance
+
         features = [
-            request.driver_id,
-            request.track_id,
-            request.season,
-            historical_data.get("avg_lap_time", 0.0),
-            historical_data.get("best_lap_time", 0.0),
-            historical_data.get("consistency_score", 0.0),
-            1.0 if request.weather_conditions == "dry" else 0.0,
-            1.0 if request.weather_conditions == "wet" else 0.0,
+            lap_number,  # lap_number
+            driver_number,  # driver_number
+            i2_speed,  # i2_speed
+            st_speed,  # st_speed
         ]
 
         return features
