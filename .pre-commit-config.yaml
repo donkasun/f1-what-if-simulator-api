@@ -8,6 +8,10 @@ repos:
       - id: check-added-large-files
       - id: check-merge-conflict
       - id: debug-statements
+      - id: check-json
+      - id: check-toml
+      - id: check-case-conflict
+      - id: check-docstring-first
 
   - repo: https://github.com/psf/black
     rev: 25.1.0
@@ -28,14 +32,35 @@ repos:
     hooks:
       - id: mypy
         args: [--ignore-missing-imports]
+        stages: [pre-commit, pre-push]
 
   - repo: local
     hooks:
       - id: pytest
         name: pytest
-        entry: pytest
+        entry: python3 -m pytest
         language: system
         pass_filenames: false
         always_run: true
         args: [tests/, --tb=short]
-        stages: [pre-push]
+        stages: [pre-commit, pre-push]
+        description: "Run all tests to ensure code quality"
+
+      - id: pytest-fast
+        name: pytest-fast
+        entry: python3 -m pytest
+        language: system
+        pass_filenames: false
+        always_run: true
+        args: [tests/, --tb=short, -x, --maxfail=3]
+        stages: [pre-commit]
+        description: "Run tests and stop on first failure (commit stage)"
+
+      - id: import-check
+        name: import-check
+        entry: python3 -c "import app.api.v1.endpoints, app.services.simulation_service, app.services.feature_engineering_service; print('✅ All modules import successfully')"
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit]
+        description: "Check that all critical modules can be imported"

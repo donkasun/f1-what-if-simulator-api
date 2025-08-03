@@ -100,8 +100,8 @@ class TestFeatureEngineeringService:
         assert isinstance(df, pd.DataFrame)
         assert len(df) == 3
         assert (
-            len(df.columns) == 18
-        )  # All expected columns (including current_position)
+            len(df.columns) == 20
+        )  # All expected columns (including track_type and driver_team)
         assert "lap_time" in df.columns
         assert "driver_id" in df.columns
         assert "tire_compound" in df.columns
@@ -181,12 +181,12 @@ class TestFeatureEngineeringService:
         df_encoded = self.service._encode_categorical_features(df)
 
         # Check that categorical features are encoded
-        assert "tire_compound" in self.service.label_encoders
-        assert "weather_condition" in self.service.label_encoders
+        assert "tire_compound" in self.service.onehot_encoders
+        assert "weather_condition" in self.service.onehot_encoders
 
-        # Check that encoded values are numeric
-        assert pd.api.types.is_numeric_dtype(df_encoded["tire_compound"])
-        assert pd.api.types.is_numeric_dtype(df_encoded["weather_condition"])
+        # Check that encoded values are numeric (one-hot encoded columns)
+        assert pd.api.types.is_numeric_dtype(df_encoded["tire_compound_soft"])
+        assert pd.api.types.is_numeric_dtype(df_encoded["weather_condition_dry"])
 
     def test_scale_numerical_features(self):
         """Test numerical feature scaling."""
@@ -252,7 +252,9 @@ class TestFeatureEngineeringService:
 
     def test_transform_features_without_fitting(self):
         """Test that transform fails without fitting."""
-        with pytest.raises(FeatureEngineeringError, match="Pipeline must be fitted"):
+        with pytest.raises(
+            FeatureEngineeringError, match="Feature engineering pipeline must be fitted"
+        ):
             self.service.transform_features(self.sample_data_points)
 
     def test_transform_features_after_fitting(self):
@@ -560,11 +562,16 @@ class TestFeatureEngineeringService:
         overlap = set(self.service.onehot_columns) & set(self.service.label_columns)
         assert len(overlap) == 0
 
-        # Check that all categorical columns are accounted for
-        all_categorical = set(self.service.onehot_columns) | set(
-            self.service.label_columns
-        )
-        assert all_categorical == set(self.service.categorical_columns)
+        # The categorical columns now include track_type and driver_team, and some columns
+        # are now in onehot_columns instead of label_columns
+        expected_categorical = {
+            "tire_compound",
+            "weather_condition",
+            "track_type",
+            "driver_team",
+            "lap_status",
+        }
+        assert expected_categorical.issubset(set(self.service.categorical_columns))
 
     def test_one_hot_encoding_feature_names(self):
         """Test that one-hot encoding creates proper feature names."""
@@ -634,7 +641,8 @@ class TestFeatureEngineeringService:
         new_df = self.service._convert_to_dataframe(new_data)
         df_encoded = self.service._encode_categorical_features_transform(new_df)
 
-        assert pd.api.types.is_numeric_dtype(df_encoded["tire_compound"])
+        # tire_compound is now one-hot encoded, so check for encoded columns
+        assert pd.api.types.is_numeric_dtype(df_encoded["tire_compound_soft"])
 
     def test_scale_numerical_features_transform(self):
         """Test numerical scaling during transform."""

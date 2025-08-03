@@ -230,6 +230,71 @@ If you need to skip hooks (not recommended):
 git commit --no-verify -m "Emergency fix"
 ```
 
+### 🤖 Automated Workflows
+
+The project includes several GitHub Actions workflows that run automatically:
+
+#### Branch Issue Management
+
+When a branch is created with an issue number, the workflow automatically:
+
+- **Extracts issue numbers** from branch names using patterns:
+  - `FWI-BE-XXX` format
+  - `feature/FWI-BE-XXX` format
+  - `bugfix/FWI-BE-XXX` format
+  - `hotfix/FWI-BE-XXX` format
+  - `issue-XXX` format
+- **Moves issues to "In Progress" status** in the GitHub project board
+- **Adds comments to issues** with branch creation details
+- **Logs helpful information** when no issue numbers are found
+
+**How to use:**
+1. Create branches with issue numbers: `feature/FWI-BE-123`, `bugfix/FWI-BE-456`
+2. The workflow will automatically move the issue to In Progress status
+3. Issue comments will include branch details and status updates
+
+**Triggers:**
+- Branch creation (push to new branch)
+- Excludes `main`, `develop`, and `releases/**` branches
+
+#### PR Issue Management
+
+When a Pull Request is created, the workflow automatically:
+
+- **Extracts linked issues** from PR title and body using patterns:
+  - `FWI-BE-XXX` format
+  - `#XXX` format
+  - `closes #XXX`, `fixes #XXX`, `resolves #XXX`
+- **Moves issues to "Review" status** in the GitHub project board
+- **Adds helpful comments** to PRs with status updates
+- **Notifies when no linked issues** are found
+
+**Complete Workflow:**
+
+1. **Start Development:**
+   - Create branch with issue number: `feature/FWI-BE-123`
+   - Issue automatically moves to "In Progress" status
+   - Issue gets comment with branch details
+
+2. **Submit for Review:**
+   - Create PR with issue reference: `FWI-BE-123: Add new feature`
+   - Issue automatically moves to "Review" status
+   - PR gets comment with status update
+
+3. **Complete Work:**
+   - Merge PR with closing keywords: `Closes #123`
+   - Issue automatically moves to "Done" status
+
+**Triggers:**
+- PR opened, reopened, or synchronized
+- Targets `main` and `develop` branches
+
+#### CI/CD Pipeline
+
+- **Linting & Formatting**: Runs `black`, `ruff`, and `mypy`
+- **Testing**: Runs all tests with pytest
+- **Code Quality**: Ensures all pre-commit hooks pass
+
 ### Running Tests
 
 ```bash

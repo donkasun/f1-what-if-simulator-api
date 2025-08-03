@@ -1,0 +1,136 @@
+name: PR Issue Management
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+    branches:
+      - main
+      - develop
+
+permissions:
+  issues: write
+  pull-requests: write
+  contents: read
+
+jobs:
+  move-issue-to-review:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Extract issue numbers from PR title and body
+        id: extract-issues
+        run: |
+          # Extract issue numbers from PR title and body
+          PR_TITLE="${{ github.event.pull_request.title }}"
+          PR_BODY="${{ github.event.pull_request.body }}"
+
+          # Patterns to match issue references
+          PATTERNS=(
+            "FWI-BE-[0-9]+"
+            "#[0-9]+"
+            "closes #[0-9]+"
+            "fixes #[0-9]+"
+            "resolves #[0-9]+"
+          )
+
+          ISSUES=""
+
+          for pattern in "${PATTERNS[@]}"; do
+            # Search in PR title
+            if echo "$PR_TITLE" | grep -o "$pattern" > /dev/null; then
+              ISSUES="$ISSUES $(echo "$PR_TITLE" | grep -o "$pattern")"
+            fi
+
+            # Search in PR body
+            if echo "$PR_BODY" | grep -o "$pattern" > /dev/null; then
+              ISSUES="$ISSUES $(echo "$PR_BODY" | grep -o "$pattern")"
+            fi
+          done
+
+          # Remove duplicates and clean up
+          ISSUES=$(echo "$ISSUES" | tr ' ' '\n' | sort -u | tr '\n' ' ' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+
+          echo "Found issues: $ISSUES"
+          echo "issues=$ISSUES" >> $GITHUB_OUTPUT
+
+      - name: Move issues to Review status
+        if: steps.extract-issues.outputs.issues != ''
+        run: |
+          ISSUES="${{ steps.extract-issues.outputs.issues }}"
+
+          for issue in $ISSUES; do
+            # Clean up issue reference (remove # if present)
+            CLEAN_ISSUE=$(echo "$issue" | sed 's/^#//')
+
+            echo "Processing issue: $CLEAN_ISSUE"
+
+            # Check if issue exists and is in a project
+            if gh issue view "$CLEAN_ISSUE" --json projectCards > /dev/null 2>&1; then
+              echo "Issue $CLEAN_ISSUE found, checking project status..."
+
+                            # Check current labels
+              CURRENT_LABELS=$(gh issue view "$CLEAN_ISSUE" --json labels --jq '.labels[].name' 2>/dev/null || echo "")
+              echo "Current labels: $CURRENT_LABELS"
+
+              # Only move to Review if not already labeled as In Review or Done
+              if ! echo "$CURRENT_LABELS" | grep -q "In Review" && ! echo "$CURRENT_LABELS" | grep -q "Done"; then
+                echo "Moving issue $CLEAN_ISSUE to Review status..."
+
+                # Move to Review column using GitHub CLI
+                gh issue edit "$CLEAN_ISSUE" --add-label "In Review" || {
+                  echo "⚠️ Could not add 'In Review' label to issue $CLEAN_ISSUE"
+                  echo "This might be because the issue doesn't exist or the label doesn't exist"
+                }
+
+                # Try to update project status if available
+                gh project item-edit --id "$CLEAN_ISSUE" --field-name "Status" --single-select-option "Review" 2>/dev/null || {
+                  echo "ℹ️ Could not update project status for issue $CLEAN_ISSUE (this is normal if not using GitHub Projects)"
+                }
+
+                echo "✅ Successfully moved issue $CLEAN_ISSUE to Review status"
+                              else
+                  echo "ℹ️ Issue $CLEAN_ISSUE is already labeled as In Review or Done, skipping"
+                fi
+            else
+              echo "⚠️ Issue $CLEAN_ISSUE not found or not accessible"
+            fi
+          done
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Comment on PR with status update
+        if: steps.extract-issues.outputs.issues != ''
+        run: |
+          ISSUES="${{ steps.extract-issues.outputs.issues }}"
+
+          COMMENT="## 🤖 Automated Issue Management
+
+          The following issues have been moved to **Review** status:
+
+          $ISSUES
+
+          ---
+          *This action was performed automatically when this PR was created.*"
+
+          gh pr comment ${{ github.event.pull_request.number }} --body "$COMMENT"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: No issues found notification
+        if: steps.extract-issues.outputs.issues == ''
+        run: |
+          COMMENT="## 🤖 Automated Issue Management
+
+          No linked issues found in this PR. If this PR addresses an issue, please:
+
+          - Add the issue number to the PR title (e.g., 'FWI-BE-123: Add new feature')
+          - Or add 'Closes #123' to the PR description
+
+          ---
+          *This will automatically move the issue to Review status.*"
+
+          gh pr comment ${{ github.event.pull_request.number }} --body "$COMMENT"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
