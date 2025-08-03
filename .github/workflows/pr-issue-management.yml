@@ -85,9 +85,16 @@ jobs:
                 }
 
                 # Try to update project status if available
-                gh project item-edit --id "$CLEAN_ISSUE" --field-name "Status" --single-select-option "Review" 2>/dev/null || {
-                  echo "ℹ️ Could not update project status for issue $CLEAN_ISSUE (this is normal if not using GitHub Projects)"
-                }
+                ITEM_ID=$(gh issue view "$CLEAN_ISSUE" --json 'projectItems(first: 10)' --template '{{range .projectItems.nodes}}{{.id}}{{"\n"}}{{end}}' | head -n 1)
+
+                if [ -n "$ITEM_ID" ]; then
+                    echo "Found project item ID: $ITEM_ID. Updating project status..."
+                    gh project item-edit --id "$ITEM_ID" --field-name "Status" --single-select-option "In Review" 2>/dev/null || {
+                        echo "ℹ️ Could not update project status for issue $CLEAN_ISSUE (item ID $ITEM_ID)"
+                    }
+                else
+                    echo "ℹ️ Could not find project item for issue $CLEAN_ISSUE (this is normal if not using GitHub Projects)"
+                fi
 
                 echo "✅ Successfully moved issue $CLEAN_ISSUE to Review status"
                               else

@@ -181,7 +181,17 @@ class TestSimulationServiceExtended:
             "data_points": 5,
         }
 
-        with patch("app.services.simulation_service.OpenF1Client") as mock_client_class:
+        with (
+            patch("app.services.simulation_service.OpenF1Client") as mock_client_class,
+            patch(
+                "app.services.simulation_service.SimulationService._get_historical_data",
+                new_callable=AsyncMock,
+            ) as mock_get_historical,
+        ):
+            mock_get_historical.return_value = {
+                "data_points": 50
+            }  # Mock historical data
+
             mock_client = mock_client_class.return_value
             mock_client.__aenter__ = AsyncMock(return_value=mock_client)
             mock_client.__aexit__ = AsyncMock(return_value=None)
@@ -195,7 +205,6 @@ class TestSimulationServiceExtended:
                 driver_id=1,
                 track_id=1,
                 weather_conditions="wet",
-                starting_position=1,
                 car_setup={},
             )
 

@@ -1166,7 +1166,7 @@ class SimulationService:
 
         Args:
             request: Simulation request
-            historical_data: Historical performance data
+            historical_data: Historical performance data from OpenF1Client
 
         Returns:
             Feature vector for prediction (4 features)
@@ -1175,10 +1175,14 @@ class SimulationService:
         # Our trained model expects: [lap_number, driver_number, i2_speed, st_speed]
 
         # Use historical data to prepare features
-        lap_number = historical_data.get("total_laps", 50) // 2  # Assume mid-race
+        # 'data_points' from the client represents the number of historical laps found.
+        lap_number = historical_data.get("data_points", 50) // 2  # Assume mid-race
         driver_number = request.driver_id
-        i2_speed = historical_data.get("avg_i2_speed", 240.0)
-        st_speed = historical_data.get("avg_st_speed", 300.0)
+
+        # TODO: FWI-BE-111 - Enhance OpenF1Client to fetch speed trap data.
+        # For now, using default values as the current client does not provide them.
+        i2_speed = 240.0
+        st_speed = 300.0
 
         features = [
             lap_number,  # lap_number
@@ -1216,7 +1220,7 @@ class SimulationService:
         self, driver_id: int, track_id: int, season: int
     ) -> dict:
         """
-        Get historical data for a driver and track.
+        Get historical data for a driver and track using the OpenF1Client.
 
         Args:
             driver_id: Driver identifier
@@ -1226,39 +1230,16 @@ class SimulationService:
         Returns:
             Historical performance data
         """
-        # TODO: Implement real data fetching from OpenF1Client
-        return self._get_mock_historical_data(driver_id, track_id, season)
-
-    def _get_mock_historical_data(
-        self, driver_id: int, track_id: int, season: int
-    ) -> dict:
-        """
-        Get mock historical data for development purposes.
-
-        Args:
-            driver_id: Driver identifier
-            track_id: Track identifier
-            season: F1 season year
-
-        Returns:
-            Mock historical performance data
-        """
-        # Generate realistic mock data based on driver and track
-        base_lap_time = 75.0 + (driver_id * 0.5) + (track_id * 1.2)
-
-        return {
-            "avg_lap_time": base_lap_time,
-            "best_lap_time": base_lap_time - 2.0,
-            "consistency_score": 0.85 + (driver_id * 0.02),
-            "data_points": 25 + (driver_id * 5),
-            "last_race_position": max(1, driver_id),
-            "qualifying_position": max(1, driver_id),
-            "weather_conditions": ["dry", "wet", "intermediate"],
-            "tire_usage": {"soft": 0.3, "medium": 0.4, "hard": 0.3},
-            "total_laps": 50,
-            "avg_i2_speed": 240.0 + (driver_id * 1.5),
-            "avg_st_speed": 300.0 + (driver_id * 2.0),
-        }
+        logger.info(
+            "Fetching historical data from OpenF1Client",
+            driver_id=driver_id,
+            track_id=track_id,
+            season=season,
+        )
+        async with self.openf1_client as client:
+            return await client.get_historical_data(  # type: ignore
+                driver_id=driver_id, track_id=track_id, season=season
+            )
 
     # FWI-BE-106: Enhanced Categorical Encoding Methods
 
