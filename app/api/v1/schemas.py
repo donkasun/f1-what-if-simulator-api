@@ -36,8 +36,12 @@ class TrackResponse(BaseModel):
     track_id: int = Field(..., description="Unique track identifier")
     name: str = Field(..., description="Track name")
     country: str = Field(..., description="Country where the track is located")
-    circuit_length: float = Field(..., description="Track length in kilometers")
-    number_of_laps: int = Field(..., description="Number of laps in the race")
+    circuit_length: Optional[float] = Field(
+        None, description="Track length in kilometers"
+    )
+    number_of_laps: Optional[int] = Field(
+        None, description="Number of laps in the race"
+    )
 
     model_config = {
         "json_schema_extra": {
