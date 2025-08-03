@@ -631,10 +631,10 @@ class SimulationService:
 
     def remove_from_cache(self, simulation_id: str) -> bool:
         """
-        Remove a specific simulation from cache.
+        Remove a specific simulation result from cache.
 
         Args:
-            simulation_id: Simulation ID to remove
+            simulation_id: Unique simulation identifier
 
         Returns:
             True if removed, False if not found
@@ -643,7 +643,218 @@ class SimulationService:
             del self._simulation_cache[simulation_id]
             logger.info("Removed simulation from cache", simulation_id=simulation_id)
             return True
-        return False
+        else:
+            logger.warning(
+                "Attempted to remove non-existent simulation from cache",
+                simulation_id=simulation_id,
+            )
+            return False
+
+    async def get_feature_importance(self, session_key: int) -> Dict[str, float]:
+        """
+        Get feature importance scores for a specific session.
+
+        Args:
+            session_key: Session identifier
+
+        Returns:
+            Dictionary mapping feature names to importance scores
+        """
+        logger.info("Getting feature importance", session_key=session_key)
+
+        # Get session data and fit feature engineering pipeline
+        request = DataProcessingRequest(
+            session_key=session_key,
+            include_weather=True,
+            include_grid=True,
+            include_lap_times=True,
+            include_pit_stops=True,
+        )
+
+        processed_response = await self.process_session_data(request)
+
+        # Fit the feature engineering pipeline
+        features, targets, metadata = (
+            self.feature_engineering_service.fit_transform_features(
+                processed_response.processed_data, target_column="lap_time"
+            )
+        )
+
+        # Get feature importance
+        feature_importance = self.feature_engineering_service.get_feature_importance(
+            "lap_time"
+        )
+
+        return feature_importance
+
+    async def get_encoding_info(self, session_key: int) -> Dict[str, Any]:
+        """
+        Get information about categorical encoding for a specific session.
+
+        Args:
+            session_key: Session identifier
+
+        Returns:
+            Dictionary containing encoding information
+        """
+        logger.info("Getting encoding information", session_key=session_key)
+
+        # Get session data and fit feature engineering pipeline
+        request = DataProcessingRequest(
+            session_key=session_key,
+            include_weather=True,
+            include_grid=True,
+            include_lap_times=True,
+            include_pit_stops=True,
+        )
+
+        processed_response = await self.process_session_data(request)
+
+        # Fit the feature engineering pipeline
+        features, targets, metadata = (
+            self.feature_engineering_service.fit_transform_features(
+                processed_response.processed_data, target_column="lap_time"
+            )
+        )
+
+        # Get encoding information
+        encoding_info = {
+            "onehot_columns": self.feature_engineering_service.onehot_columns,
+            "label_columns": self.feature_engineering_service.label_columns,
+            "total_encoded_features": len(
+                self.feature_engineering_service.onehot_columns
+            )
+            + len(self.feature_engineering_service.label_columns),
+            "onehot_encoders": {
+                col: {
+                    "categories": encoder.categories_[0].tolist(),
+                    "n_features": len(encoder.categories_[0]),
+                }
+                for col, encoder in self.feature_engineering_service.onehot_encoders.items()
+            },
+            "label_encoders": {
+                col: {
+                    "classes": encoder.classes_.tolist(),
+                    "n_classes": len(encoder.classes_),
+                }
+                for col, encoder in self.feature_engineering_service.label_encoders.items()
+            },
+        }
+
+        return encoding_info
+
+    async def apply_one_hot_encoding(
+        self, request: DataProcessingRequest
+    ) -> Dict[str, Any]:
+        """
+        Apply one-hot encoding to categorical features for a session.
+
+        Args:
+            request: Data processing request
+
+        Returns:
+            Dictionary containing encoding results
+        """
+        logger.info("Applying one-hot encoding", session_key=request.session_key)
+
+        start_time = time.time()
+
+        # Process session data
+        processed_response = await self.process_session_data(request)
+
+        # Fit the feature engineering pipeline
+        features, targets, metadata = (
+            self.feature_engineering_service.fit_transform_features(
+                processed_response.processed_data, target_column="lap_time"
+            )
+        )
+
+        # Get encoding information
+        encoding_info = await self.get_encoding_info(request.session_key)
+
+        # Calculate new feature names from one-hot encoding
+        new_feature_names = []
+        for col in self.feature_engineering_service.onehot_columns:
+            if col in self.feature_engineering_service.onehot_encoders:
+                encoder = self.feature_engineering_service.onehot_encoders[col]
+                feature_names = [f"{col}_{cat}" for cat in encoder.categories_[0]]
+                new_feature_names.extend(feature_names)
+
+        processing_time_ms = int((time.time() - start_time) * 1000)
+
+        encoding_result = {
+            "onehot_features_created": len(new_feature_names),
+            "original_categorical_features": self.feature_engineering_service.onehot_columns,
+            "new_feature_names": new_feature_names,
+            "encoding_info": encoding_info,
+            "processing_time_ms": processing_time_ms,
+            "features_shape": features.shape,
+            "targets_shape": targets.shape,
+        }
+
+        return encoding_result
+
+    async def get_encoding_statistics(self, session_key: int) -> Dict[str, Any]:
+        """
+        Get encoding statistics for a specific session.
+
+        Args:
+            session_key: Session identifier
+
+        Returns:
+            Dictionary containing encoding statistics
+        """
+        logger.info("Getting encoding statistics", session_key=session_key)
+
+        # Get session data and fit feature engineering pipeline
+        request = DataProcessingRequest(
+            session_key=session_key,
+            include_weather=True,
+            include_grid=True,
+            include_lap_times=True,
+            include_pit_stops=True,
+        )
+
+        processed_response = await self.process_session_data(request)
+
+        # Fit the feature engineering pipeline
+        features, targets, metadata = (
+            self.feature_engineering_service.fit_transform_features(
+                processed_response.processed_data, target_column="lap_time"
+            )
+        )
+
+        # Calculate feature cardinality
+        feature_cardinality = {}
+        for col in self.feature_engineering_service.categorical_columns:
+            if col in processed_response.processed_data:
+                unique_values = set()
+                for point in processed_response.processed_data:
+                    if hasattr(point, col):
+                        value = getattr(point, col)
+                        if value is not None:
+                            unique_values.add(str(value))
+                feature_cardinality[col] = len(unique_values)
+
+        encoding_stats = {
+            "total_categorical_features": len(
+                self.feature_engineering_service.categorical_columns
+            ),
+            "onehot_encoded_features": len(
+                self.feature_engineering_service.onehot_columns
+            ),
+            "label_encoded_features": len(
+                self.feature_engineering_service.label_columns
+            ),
+            "feature_cardinality": feature_cardinality,
+            "total_features_after_encoding": features.shape[1],
+            "encoding_methods": {
+                "onehot": self.feature_engineering_service.onehot_columns,
+                "label": self.feature_engineering_service.label_columns,
+            },
+        }
+
+        return encoding_stats
 
     async def process_session_data(
         self, request: DataProcessingRequest

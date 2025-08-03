@@ -13,7 +13,7 @@ import pandas as pd
 from typing import Dict, List, Optional, Tuple, Any
 import structlog
 from sklearn.impute import SimpleImputer
-from sklearn.preprocessing import StandardScaler, LabelEncoder
+from sklearn.preprocessing import StandardScaler, LabelEncoder, OneHotEncoder
 from sklearn.feature_selection import SelectKBest, f_regression
 
 from app.api.v1.schemas import ProcessedDataPoint
@@ -30,11 +30,14 @@ class FeatureEngineeringService:
         self.imputers: Dict[str, SimpleImputer] = {}
         self.scalers: Dict[str, StandardScaler] = {}
         self.label_encoders: Dict[str, LabelEncoder] = {}
+        self.onehot_encoders: Dict[str, OneHotEncoder] = {}
         self.feature_selectors: Dict[str, SelectKBest] = {}
         self.feature_columns: List[str] = []
         self.target_columns: List[str] = []
         self.categorical_columns: List[str] = []
         self.numerical_columns: List[str] = []
+        self.onehot_columns: List[str] = []  # Columns to use one-hot encoding
+        self.label_columns: List[str] = []  # Columns to use label encoding
         self._is_fitted = False
 
     def fit_transform_features(
@@ -101,12 +104,11 @@ class FeatureEngineeringService:
             Tuple of (features, metadata)
         """
         if not self._is_fitted:
-            raise FeatureEngineeringError("Pipeline must be fitted before transform")
+            raise FeatureEngineeringError(
+                "Feature engineering pipeline must be fitted before transforming"
+            )
 
-        logger.info(
-            "Transforming features using fitted pipeline",
-            data_points_count=len(data_points),
-        )
+        logger.info("Transforming features", data_points_count=len(data_points))
 
         # Convert to DataFrame
         df = self._convert_to_dataframe(data_points)
@@ -114,7 +116,7 @@ class FeatureEngineeringService:
         # Handle missing values using fitted imputers
         df_imputed = self._handle_missing_values_transform(df)
 
-        # Create engineered features (but don't update feature_columns)
+        # Create engineered features
         df_engineered = self._create_engineered_features_transform(df_imputed)
 
         # Encode categorical features using fitted encoders
@@ -129,66 +131,79 @@ class FeatureEngineeringService:
         # Prepare metadata
         metadata = self._prepare_metadata(df_scaled, None)
 
+        logger.info("Feature transformation completed", features_shape=features.shape)
+
         return features, metadata
 
     def _convert_to_dataframe(
         self, data_points: List[ProcessedDataPoint]
     ) -> pd.DataFrame:
         """Convert list of ProcessedDataPoint to pandas DataFrame."""
-        data = []
-        for point in data_points:
-            data.append(
-                {
-                    "timestamp": point.timestamp,
-                    "driver_id": point.driver_id,
-                    "lap_number": point.lap_number,
-                    "lap_time": point.lap_time,
-                    "sector_1_time": point.sector_1_time,
-                    "sector_2_time": point.sector_2_time,
-                    "sector_3_time": point.sector_3_time,
-                    "tire_compound": point.tire_compound,
-                    "fuel_load": point.fuel_load,
-                    "grid_position": point.grid_position,
-                    "current_position": point.current_position,
-                    "air_temperature": point.air_temperature,
-                    "track_temperature": point.track_temperature,
-                    "humidity": point.humidity,
-                    "weather_condition": point.weather_condition,
-                    "pit_stop_count": point.pit_stop_count,
-                    "total_pit_time": point.total_pit_time,
-                    "lap_status": point.lap_status,
-                }
-            )
+        if not data_points:
+            raise FeatureEngineeringError("No data points provided")
 
-        return pd.DataFrame(data)
-
-    def _define_columns(self, df: pd.DataFrame, target_column: str):
-        """Define feature and target columns."""
-        # Define target columns
-        self.target_columns = [target_column] if target_column in df.columns else []
-
-        # Define feature columns (exclude target and non-feature columns)
-        exclude_columns = ["timestamp", "driver_id", "lap_status"] + self.target_columns
-        self.feature_columns = [col for col in df.columns if col not in exclude_columns]
-
-        # Define categorical and numerical columns
-        self.categorical_columns = (
-            df[self.feature_columns]
-            .select_dtypes(include=["object", "category"])
-            .columns.tolist()
-        )
-
-        self.numerical_columns = (
-            df[self.feature_columns]
-            .select_dtypes(include=["int64", "float64"])
-            .columns.tolist()
-        )
+        # Convert to list of dictionaries
+        data_dicts = [point.model_dump() for point in data_points]
+        df = pd.DataFrame(data_dicts)
 
         logger.info(
-            "Defined columns",
-            feature_count=len(self.feature_columns),
-            categorical_count=len(self.categorical_columns),
-            numerical_count=len(self.numerical_columns),
+            "Converted data to DataFrame",
+            shape=df.shape,
+            columns=list(df.columns),
+        )
+
+        return df
+
+    def _define_columns(self, df: pd.DataFrame, target_column: str):
+        """Define feature, target, categorical, and numerical columns."""
+        # Target columns
+        self.target_columns = [target_column] if target_column in df.columns else []
+
+        # Categorical columns (string/object types)
+        self.categorical_columns = [
+            col
+            for col in df.columns
+            if df[col].dtype == "object" or df[col].dtype.name == "category"
+        ]
+
+        # Define which categorical columns should use one-hot encoding vs label encoding
+        # One-hot encoding for high-cardinality categorical features
+        self.onehot_columns = [
+            col
+            for col in self.categorical_columns
+            if col in ["weather_condition", "tire_compound", "lap_status"]
+        ]
+
+        # Label encoding for low-cardinality or ordinal categorical features
+        self.label_columns = [
+            col for col in self.categorical_columns if col not in self.onehot_columns
+        ]
+
+        # Numerical columns (exclude target and categorical)
+        self.numerical_columns = [
+            col
+            for col in df.columns
+            if col not in self.target_columns + self.categorical_columns
+            and pd.api.types.is_numeric_dtype(df[col])
+        ]
+
+        # Feature columns (all except target and non-numeric columns like timestamp)
+        exclude_columns = self.target_columns + ["timestamp"]
+        self.feature_columns = [
+            col
+            for col in df.columns
+            if col not in exclude_columns
+            and (col in self.numerical_columns or col in self.categorical_columns)
+        ]
+
+        logger.info(
+            "Defined column types",
+            target_columns=self.target_columns,
+            categorical_columns=self.categorical_columns,
+            onehot_columns=self.onehot_columns,
+            label_columns=self.label_columns,
+            numerical_columns=self.numerical_columns,
+            feature_columns_count=len(self.feature_columns),
         )
 
     def _handle_missing_values(self, df: pd.DataFrame) -> pd.DataFrame:
@@ -479,25 +494,65 @@ class FeatureEngineeringService:
         return df_engineered
 
     def _encode_categorical_features(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Encode categorical features using label encoding."""
+        """Encode categorical features using label encoding and one-hot encoding."""
         df_encoded = df.copy()
+        new_feature_columns = []
 
-        for col in self.categorical_columns:
+        # Label encoding for low-cardinality categorical features
+        for col in self.label_columns:
             if col in df_encoded.columns:
                 le = LabelEncoder()
                 df_encoded[col] = le.fit_transform(df_encoded[col].astype(str))
                 self.label_encoders[col] = le
+                new_feature_columns.append(col)
 
                 logger.info(
-                    f"Encoded categorical feature {col}", unique_values=len(le.classes_)
+                    f"Label encoded categorical feature {col}",
+                    unique_values=len(le.classes_),
                 )
+
+        # One-hot encoding for high-cardinality categorical features
+        for col in self.onehot_columns:
+            if col in df_encoded.columns:
+                ohe = OneHotEncoder(sparse_output=False, handle_unknown="ignore")
+                # Ensure all values are strings for OneHotEncoder
+                df_encoded[col] = df_encoded[col].astype(str)
+
+                # Fit the encoder
+                ohe.fit(df_encoded[col].values.reshape(-1, 1))
+                self.onehot_encoders[col] = ohe
+
+                # Transform and create new columns
+                encoded_values = ohe.transform(df_encoded[col].values.reshape(-1, 1))
+                feature_names = [f"{col}_{cat}" for cat in ohe.categories_[0]]
+
+                # Add encoded columns to DataFrame
+                for i, feature_name in enumerate(feature_names):
+                    df_encoded[feature_name] = encoded_values[:, i]
+                    new_feature_columns.append(feature_name)
+
+                # Remove original column
+                df_encoded = df_encoded.drop(columns=[col])
+
+                logger.info(
+                    f"One-hot encoded categorical feature {col}",
+                    unique_values=len(ohe.categories_[0]),
+                    new_columns=feature_names,
+                )
+
+        # Update feature columns to include new one-hot encoded columns
+        # Remove original categorical columns and add new encoded columns
+        self.feature_columns = [
+            col for col in self.feature_columns if col not in self.categorical_columns
+        ] + new_feature_columns
 
         return df_encoded
 
     def _encode_categorical_features_transform(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Encode categorical features using fitted label encoders."""
+        """Encode categorical features using fitted encoders."""
         df_encoded = df.copy()
 
+        # Label encoding using fitted encoders
         for col, le in self.label_encoders.items():
             if col in df_encoded.columns:
                 # Handle unseen categories by using a default value
@@ -506,6 +561,23 @@ class FeatureEngineeringService:
                 df_encoded[col] = df_encoded[col].apply(
                     lambda x: le.transform([x])[0] if x in le.classes_ else 0
                 )
+
+        # One-hot encoding using fitted encoders
+        for col, ohe in self.onehot_encoders.items():
+            if col in df_encoded.columns:
+                # Ensure all values are strings for OneHotEncoder
+                df_encoded[col] = df_encoded[col].astype(str)
+
+                # Transform and create new columns
+                encoded_values = ohe.transform(df_encoded[col].values.reshape(-1, 1))
+                feature_names = [f"{col}_{cat}" for cat in ohe.categories_[0]]
+
+                # Add encoded columns to DataFrame
+                for i, feature_name in enumerate(feature_names):
+                    df_encoded[feature_name] = encoded_values[:, i]
+
+                # Remove original column
+                df_encoded = df_encoded.drop(columns=[col])
 
         return df_encoded
 
@@ -547,8 +619,8 @@ class FeatureEngineeringService:
             )
 
         # Prepare feature matrix and target vector
-        X = df[self.feature_columns].to_numpy()
-        y = df[target_column].to_numpy()
+        X = df[self.feature_columns].to_numpy().astype(np.float64)
+        y = df[target_column].to_numpy().astype(np.float64)
 
         # Remove rows with NaN values
         mask = ~(np.isnan(X).any(axis=1) | np.isnan(y))
@@ -575,13 +647,12 @@ class FeatureEngineeringService:
 
     def _select_features_transform(self, df: pd.DataFrame) -> np.ndarray:
         """Select features using fitted selectors."""
-        X = df[self.feature_columns].to_numpy()
+        X = df[self.feature_columns].to_numpy().astype(np.float64)
 
         # Remove rows with NaN values
         mask = ~np.isnan(X).any(axis=1)
         X = X[mask]
 
-        # Use the first available selector (assuming single target)
         if self.feature_selectors:
             selector = list(self.feature_selectors.values())[0]
             X_selected: np.ndarray = selector.transform(X)
@@ -713,11 +784,14 @@ class FeatureEngineeringService:
         self.imputers.clear()
         self.scalers.clear()
         self.label_encoders.clear()
+        self.onehot_encoders.clear()
         self.feature_selectors.clear()
         self.feature_columns.clear()
         self.target_columns.clear()
         self.categorical_columns.clear()
         self.numerical_columns.clear()
+        self.onehot_columns.clear()
+        self.label_columns.clear()
         self._is_fitted = False
 
         logger.info("Reset feature engineering service")
