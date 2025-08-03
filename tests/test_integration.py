@@ -111,9 +111,44 @@ class TestIntegrationWeatherDataFlow:
             "data_points": 5,
         }
 
-        with patch(
-            "app.external.openf1_client.OpenF1Client.get_session_weather_summary",
-            return_value=mock_weather_summary,
+        # Mock driver and track data
+        mock_drivers = [
+            {
+                "driver_number": 1,
+                "full_name": "Max Verstappen",
+                "name_acronym": "VER",
+                "team_name": "Red Bull Racing",
+                "country_code": "NED",
+            }
+        ]
+
+        mock_tracks = [
+            {
+                "track_id": 1,
+                "name": "Monaco",
+                "country": "Monaco",
+                "circuit_length": 3.337,
+                "number_of_laps": 78,
+            }
+        ]
+
+        with (
+            patch(
+                "app.external.openf1_client.OpenF1Client.get_session_weather_summary",
+                return_value=mock_weather_summary,
+            ),
+            patch(
+                "app.external.openf1_client.OpenF1Client.get_drivers",
+                return_value=mock_drivers,
+            ),
+            patch(
+                "app.external.openf1_client.OpenF1Client.get_tracks",
+                return_value=mock_tracks,
+            ),
+            patch(
+                "app.services.simulation_service.SimulationService._get_historical_data",
+                return_value={"data_points": 50},
+            ),
         ):
             # Run simulation with weather data
             simulation_request = {
@@ -222,33 +257,68 @@ class TestIntegrationCaching:
     @pytest.mark.asyncio
     async def test_integration_simulation_caching(self):
         """Test that simulation results are properly cached."""
-        # Run the same simulation twice
-        simulation_request = {
-            "season": 2024,
-            "driver_id": 1,
-            "track_id": 1,
-            "weather_conditions": "dry",
-            "starting_position": 1,
-            "car_setup": {},
-        }
+        # Mock driver and track data
+        mock_drivers = [
+            {
+                "driver_number": 1,
+                "full_name": "Max Verstappen",
+                "name_acronym": "VER",
+                "team_name": "Red Bull Racing",
+                "country_code": "NED",
+            }
+        ]
 
-        # First simulation
-        response1 = client.post("/api/v1/simulate", json=simulation_request)
-        assert response1.status_code == 200
-        simulation_id1 = response1.json()["simulation_id"]
+        mock_tracks = [
+            {
+                "track_id": 1,
+                "name": "Monaco",
+                "country": "Monaco",
+                "circuit_length": 3.337,
+                "number_of_laps": 78,
+            }
+        ]
 
-        # Second simulation with same parameters
-        response2 = client.post("/api/v1/simulate", json=simulation_request)
-        assert response2.status_code == 200
-        simulation_id2 = response2.json()["simulation_id"]
+        with (
+            patch(
+                "app.external.openf1_client.OpenF1Client.get_drivers",
+                return_value=mock_drivers,
+            ),
+            patch(
+                "app.external.openf1_client.OpenF1Client.get_tracks",
+                return_value=mock_tracks,
+            ),
+            patch(
+                "app.services.simulation_service.SimulationService._get_historical_data",
+                return_value={"data_points": 50},
+            ),
+        ):
+            # Run the same simulation twice
+            simulation_request = {
+                "season": 2024,
+                "driver_id": 1,
+                "track_id": 1,
+                "weather_conditions": "dry",
+                "starting_position": 1,
+                "car_setup": {},
+            }
 
-        # The simulation IDs are generated randomly, so they won't be the same
-        # But we can verify that both simulations completed successfully
-        assert simulation_id1 is not None
-        assert simulation_id2 is not None
-        assert (
-            simulation_id1 != simulation_id2
-        )  # Different IDs due to random generation
+            # First simulation
+            response1 = client.post("/api/v1/simulate", json=simulation_request)
+            assert response1.status_code == 200
+            simulation_id1 = response1.json()["simulation_id"]
+
+            # Second simulation with same parameters
+            response2 = client.post("/api/v1/simulate", json=simulation_request)
+            assert response2.status_code == 200
+            simulation_id2 = response2.json()["simulation_id"]
+
+            # The simulation IDs are generated randomly, so they won't be the same
+            # But we can verify that both simulations completed successfully
+            assert simulation_id1 is not None
+            assert simulation_id2 is not None
+            assert (
+                simulation_id1 != simulation_id2
+            )  # Different IDs due to random generation
 
 
 class TestIntegrationHealthAndStatus:
@@ -323,30 +393,65 @@ class TestIntegrationDataValidation:
 
     def test_weather_conditions_validation(self):
         """Test validation of weather conditions."""
-        valid_conditions = ["dry", "wet", "intermediate"]
+        # Mock driver and track data
+        mock_drivers = [
+            {
+                "driver_number": 1,
+                "full_name": "Max Verstappen",
+                "name_acronym": "VER",
+                "team_name": "Red Bull Racing",
+                "country_code": "NED",
+            }
+        ]
 
-        for condition in valid_conditions:
-            request = {
+        mock_tracks = [
+            {
+                "track_id": 1,
+                "name": "Monaco",
+                "country": "Monaco",
+                "circuit_length": 3.337,
+                "number_of_laps": 78,
+            }
+        ]
+
+        with (
+            patch(
+                "app.external.openf1_client.OpenF1Client.get_drivers",
+                return_value=mock_drivers,
+            ),
+            patch(
+                "app.external.openf1_client.OpenF1Client.get_tracks",
+                return_value=mock_tracks,
+            ),
+            patch(
+                "app.services.simulation_service.SimulationService._get_historical_data",
+                return_value={"data_points": 50},
+            ),
+        ):
+            valid_conditions = ["dry", "wet", "intermediate"]
+
+            for condition in valid_conditions:
+                request = {
+                    "season": 2024,
+                    "driver_id": 1,
+                    "track_id": 1,
+                    "weather_conditions": condition,
+                    "starting_position": 1,
+                    "car_setup": {},
+                }
+
+                response = client.post("/api/v1/simulate", json=request)
+                assert response.status_code == 200
+
+            # Test with invalid weather condition
+            invalid_request = {
                 "season": 2024,
                 "driver_id": 1,
                 "track_id": 1,
-                "weather_conditions": condition,
+                "weather_conditions": "invalid_condition",
                 "starting_position": 1,
                 "car_setup": {},
             }
 
-            response = client.post("/api/v1/simulate", json=request)
-            assert response.status_code == 200
-
-        # Test with invalid weather condition
-        invalid_request = {
-            "season": 2024,
-            "driver_id": 1,
-            "track_id": 1,
-            "weather_conditions": "invalid_condition",
-            "starting_position": 1,
-            "car_setup": {},
-        }
-
-        response = client.post("/api/v1/simulate", json=invalid_request)
-        assert response.status_code == 422
+            response = client.post("/api/v1/simulate", json=invalid_request)
+            assert response.status_code == 422

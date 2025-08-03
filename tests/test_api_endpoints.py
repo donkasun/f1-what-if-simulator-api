@@ -17,6 +17,7 @@ from app.api.v1.schemas import (
     GridPositionResponse,
     GridSummaryResponse,
 )
+from datetime import datetime, UTC
 
 
 client = TestClient(app)
@@ -211,8 +212,6 @@ class TestSimulationEndpoints:
     @pytest.mark.asyncio
     async def test_run_simulation_success(self):
         """Test successful simulation execution."""
-        from datetime import datetime
-
         mock_result = SimulationResponse(
             simulation_id="sim_123",
             driver_id=1,
@@ -222,7 +221,7 @@ class TestSimulationEndpoints:
             confidence_score=0.92,
             weather_conditions="dry",
             car_setup={},
-            created_at=datetime.utcnow(),
+            created_at=datetime.now(UTC),
             processing_time_ms=1000,
         )
 
@@ -265,8 +264,6 @@ class TestSimulationEndpoints:
     @pytest.mark.asyncio
     async def test_get_simulation_result_success(self):
         """Test successful retrieval of simulation result."""
-        from datetime import datetime
-
         mock_result = SimulationResponse(
             simulation_id="sim_123",
             driver_id=1,
@@ -276,7 +273,7 @@ class TestSimulationEndpoints:
             confidence_score=0.92,
             weather_conditions="dry",
             car_setup={},
-            created_at=datetime.utcnow(),
+            created_at=datetime.now(UTC),
             processing_time_ms=1000,
         )
 
