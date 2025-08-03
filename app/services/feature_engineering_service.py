@@ -905,9 +905,9 @@ class FeatureEngineeringService:
                 validation_results["encoding_consistency"][feature_name] = "consistent"
             else:
                 validation_results["feature_validations"][feature_name] = False
-                validation_results["encoding_consistency"][feature_name] = (
-                    "missing_encoding"
-                )
+                validation_results["encoding_consistency"][
+                    feature_name
+                ] = "missing_encoding"
                 validation_results["validation_errors"].append(
                     f"No encoder found for {feature_name}"
                 )
@@ -920,9 +920,9 @@ class FeatureEngineeringService:
                 validation_results["encoding_consistency"][feature_name] = "consistent"
             else:
                 validation_results["feature_validations"][feature_name] = False
-                validation_results["encoding_consistency"][feature_name] = (
-                    "missing_encoding"
-                )
+                validation_results["encoding_consistency"][
+                    feature_name
+                ] = "missing_encoding"
                 validation_results["validation_errors"].append(
                     f"No encoder found for {feature_name}"
                 )

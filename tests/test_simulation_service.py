@@ -433,9 +433,7 @@ async def test_process_session_data_session_not_found():
     """Test session data processing when session is not found."""
     from app.api.v1.schemas import DataProcessingRequest
 
-    with (
-        patch("app.services.simulation_service.OpenF1Client") as mock_client_class,
-    ):
+    with (patch("app.services.simulation_service.OpenF1Client") as mock_client_class,):
         mock_client = mock_client_class.return_value
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
         mock_client.__aexit__ = AsyncMock(return_value=None)
