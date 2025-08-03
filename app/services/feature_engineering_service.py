@@ -527,11 +527,13 @@ class FeatureEngineeringService:
                 df_encoded[col] = df_encoded[col].astype(str)
 
                 # Fit the encoder
-                ohe.fit(df_encoded[col].values.reshape(-1, 1))
+                ohe.fit(df_encoded[col].to_numpy().reshape(-1, 1))
                 self.onehot_encoders[col] = ohe
 
                 # Transform and create new columns
-                encoded_values = ohe.transform(df_encoded[col].values.reshape(-1, 1))
+                encoded_values = ohe.transform(
+                    df_encoded[col].to_numpy().reshape(-1, 1)
+                )
                 feature_names = [f"{col}_{cat}" for cat in ohe.categories_[0]]
 
                 # Add encoded columns to DataFrame
@@ -577,7 +579,9 @@ class FeatureEngineeringService:
                 df_encoded[col] = df_encoded[col].astype(str)
 
                 # Transform and create new columns
-                encoded_values = ohe.transform(df_encoded[col].values.reshape(-1, 1))
+                encoded_values = ohe.transform(
+                    df_encoded[col].to_numpy().reshape(-1, 1)
+                )
                 feature_names = [f"{col}_{cat}" for cat in ohe.categories_[0]]
 
                 # Add encoded columns to DataFrame
@@ -832,17 +836,17 @@ class FeatureEngineeringService:
             categories = encoder.categories_[0].tolist()
 
             # Create feature mappings
-            feature_mappings = {}
+            onehot_feature_mappings = {}
             for i, cat in enumerate(categories):
                 mapping = [0] * len(categories)
                 mapping[i] = 1
-                feature_mappings[cat] = mapping
+                onehot_feature_mappings[cat] = mapping
 
             return {
                 "feature_name": feature_name,
                 "encoding_type": "onehot",
                 "categories": categories,
-                "feature_mappings": feature_mappings,
+                "feature_mappings": onehot_feature_mappings,
                 "encoded_feature_names": [
                     f"{feature_name}_{cat}" for cat in categories
                 ],
@@ -859,15 +863,15 @@ class FeatureEngineeringService:
             categories = encoder.classes_.tolist()
 
             # Create feature mappings
-            feature_mappings = {}
+            label_feature_mappings: Dict[str, int] = {}
             for i, cat in enumerate(categories):
-                feature_mappings[cat] = i
+                label_feature_mappings[cat] = i
 
             return {
                 "feature_name": feature_name,
                 "encoding_type": "label",
                 "categories": categories,
-                "feature_mappings": feature_mappings,
+                "feature_mappings": label_feature_mappings,
                 "encoded_feature_names": [feature_name],
                 "encoding_metadata": {"cardinality": len(categories)},
                 "validation_passed": True,
@@ -885,12 +889,13 @@ class FeatureEngineeringService:
                 "Feature engineering service must be fitted first"
             )
 
-        validation_results = {
+        validation_results: Dict[str, Any] = {
             "total_features_validated": len(self.categorical_columns),
             "validation_passed": True,
             "feature_validations": {},
             "encoding_consistency": {},
             "validation_errors": [],
+            "validation_time_ms": 0,  # Initialize with default value
         }
 
         # Validate one-hot encodings

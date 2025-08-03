@@ -1037,7 +1037,7 @@ class OpenF1Client:
                 if lap.get("tire_compound"):
                     tire_compounds.add(lap.get("tire_compound"))
 
-            tire_compounds = list(tire_compounds)
+            tire_compounds_list = list(tire_compounds)
 
             # Determine final position (mock for now)
             final_position = (
@@ -1058,7 +1058,7 @@ class OpenF1Client:
                 "total_pit_stops": total_pit_stops,
                 "total_pit_time": total_pit_time,
                 "avg_pit_time": avg_pit_time,
-                "tire_compounds_used": tire_compounds,
+                "tire_compounds_used": tire_compounds_list,
                 "final_position": final_position,
                 "race_status": race_status,
             }
@@ -1091,7 +1091,7 @@ class OpenF1Client:
                 response = await self._client.request(method, url, params=params)
                 response_time_ms = int((time.time() - start_time) * 1000)
                 if response.status_code == 200:
-                    data = response.json()
+                    data: List[Dict] = response.json()
                     logger.info(
                         "OpenF1 API request successful",
                         method=method,
@@ -1149,6 +1149,9 @@ class OpenF1Client:
                     exc_info=True,
                 )
                 raise OpenF1APIError(f"Unexpected error: {str(e)}", 500)
+
+        # This should never be reached, but MyPy needs it
+        raise OpenF1APIError("Request failed after all retries", 500)
 
     def _process_historical_data(self, lap_times: List[Dict]) -> Dict:
         """

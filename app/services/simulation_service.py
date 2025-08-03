@@ -663,7 +663,8 @@ class SimulationService:
         )
 
         # Get encoding information from feature engineering service
-        return self.feature_engineering_service.get_encoding_info()
+        result: Dict[str, Any] = self.feature_engineering_service.get_encoding_info()
+        return result
 
     async def apply_one_hot_encoding(
         self, request: DataProcessingRequest
@@ -692,8 +693,10 @@ class SimulationService:
         )
 
         # Apply one-hot encoding using feature engineering service
-        encoding_result = self.feature_engineering_service.apply_one_hot_encoding(
-            self.feature_engineering_service.onehot_columns
+        encoding_result: Dict[str, Any] = (
+            self.feature_engineering_service.apply_one_hot_encoding(
+                self.feature_engineering_service.onehot_columns
+            )
         )
 
         processing_time_ms = int((time.time() - start_time) * 1000)
@@ -736,7 +739,10 @@ class SimulationService:
         )
 
         # Get encoding statistics from feature engineering service
-        return self.feature_engineering_service.get_encoding_statistics()
+        result: Dict[str, Any] = (
+            self.feature_engineering_service.get_encoding_statistics()
+        )
+        return result
 
     async def process_session_data(
         self, request: DataProcessingRequest
