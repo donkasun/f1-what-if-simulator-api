@@ -57,7 +57,7 @@ async def get_drivers(
     logger.info("Fetching drivers", season=season)
     try:
         drivers = await simulation_service.get_drivers(season)
-        return drivers
+        return drivers  # type: ignore
     except Exception as e:
         logger.error(
             "Failed to fetch drivers", season=season, error=str(e), exc_info=True
@@ -74,7 +74,7 @@ async def get_tracks(
     logger.info("Fetching tracks", season=season)
     try:
         tracks = await simulation_service.get_tracks(season)
-        return tracks
+        return tracks  # type: ignore
     except Exception as e:
         logger.error(
             "Failed to fetch tracks", season=season, error=str(e), exc_info=True
