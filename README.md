@@ -230,6 +230,37 @@ If you need to skip hooks (not recommended):
 git commit --no-verify -m "Emergency fix"
 ```
 
+### 🤖 Automated Workflows
+
+The project includes several GitHub Actions workflows that run automatically:
+
+#### PR Issue Management
+
+When a Pull Request is created, the workflow automatically:
+
+- **Extracts linked issues** from PR title and body using patterns:
+  - `FWI-BE-XXX` format
+  - `#XXX` format
+  - `closes #XXX`, `fixes #XXX`, `resolves #XXX`
+- **Moves issues to "Review" status** in the GitHub project board
+- **Adds helpful comments** to PRs with status updates
+- **Notifies when no linked issues** are found
+
+**How to use:**
+1. Include issue numbers in your PR title: `FWI-BE-123: Add new feature`
+2. Or add closing keywords in PR description: `Closes #123`
+3. The workflow will automatically move the issue to Review status
+
+**Triggers:**
+- PR opened, reopened, or synchronized
+- Targets `main` and `develop` branches
+
+#### CI/CD Pipeline
+
+- **Linting & Formatting**: Runs `black`, `ruff`, and `mypy`
+- **Testing**: Runs all tests with pytest
+- **Code Quality**: Ensures all pre-commit hooks pass
+
 ### Running Tests
 
 ```bash
