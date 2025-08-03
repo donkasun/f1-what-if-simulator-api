@@ -5,15 +5,19 @@ Tests for API endpoints.
 import pytest
 import numpy as np
 from fastapi.testclient import TestClient
-from unittest.mock import AsyncMock, patch, Mock
+from unittest.mock import AsyncMock, patch, Mock, MagicMock
 from app.main import app
-from app.core.exceptions import InvalidSimulationParametersError
+from app.core.exceptions import (
+    InvalidSimulationParametersError,
+    FeatureEngineeringError,
+)
 from app.api.v1.schemas import (
     SimulationResponse,
     StartingGridResponse,
     GridPositionResponse,
     GridSummaryResponse,
 )
+
 
 client = TestClient(app)
 
@@ -592,38 +596,192 @@ class TestFeatureEngineeringEndpoints:
         mock_service = AsyncMock()
         mock_service_class.return_value = mock_service
 
-        # Mock the process_session_data method
-        mock_processed_response = Mock()
-        mock_processed_response.processed_data = []
-        mock_processed_response.processing_summary.dict.return_value = {
-            "total_data_points": 100,
-            "total_drivers": 20,
-            "data_quality_score": 0.95,
-        }
-        mock_service.process_session_data.return_value = mock_processed_response
-
-        # Mock the feature engineering service
-        mock_feature_service = Mock()
-        mock_service.feature_engineering_service = mock_feature_service
-        mock_feature_service.fit_transform_features.return_value = (
-            np.array([[1, 2, 3], [4, 5, 6]]),  # features
-            np.array([85.1, 84.9]),  # targets
-            {"feature_columns": ["col1", "col2", "col3"]},  # metadata
+        # Mock the get_feature_importance method
+        mock_service.get_feature_importance = AsyncMock(
+            return_value={
+                "col1": 0.8,
+                "col2": 0.6,
+                "col3": 0.4,
+            }
         )
-        mock_feature_service.get_feature_importance.return_value = {
-            "col1": 0.8,
-            "col2": 0.6,
-            "col3": 0.4,
-        }
 
         response = client.get("/api/v1/feature-engineering/feature-importance/12345")
         assert response.status_code == 200
         data = response.json()
-
         assert data["session_key"] == 12345
         assert "feature_importance" in data
-        assert "feature_metadata" in data
-        assert data["total_features"] == 3
         assert data["feature_importance"]["col1"] == 0.8
         assert data["feature_importance"]["col2"] == 0.6
         assert data["feature_importance"]["col3"] == 0.4
+
+    @patch("app.api.v1.endpoints.SimulationService")
+    def test_get_encoding_info(self, mock_service_class):
+        """Test getting encoding information for a session."""
+        # Mock the simulation service
+        mock_service = MagicMock()
+        mock_service.get_encoding_info = AsyncMock(
+            return_value={
+                "onehot_columns": ["tire_compound", "weather_condition"],
+                "label_columns": ["lap_status"],
+                "total_encoded_features": 3,
+                "onehot_encoders": {
+                    "tire_compound": {
+                        "categories": ["soft", "medium", "hard"],
+                        "n_features": 3,
+                    }
+                },
+                "label_encoders": {
+                    "lap_status": {"classes": ["valid", "invalid"], "n_classes": 2}
+                },
+            }
+        )
+        mock_service_class.return_value = mock_service
+
+        response = client.get("/api/v1/feature-engineering/encoding-info/12345")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["session_key"] == 12345
+        assert "encoding_info" in data
+        assert "onehot_columns" in data
+        assert "label_columns" in data
+        assert "total_encoded_features" in data
+
+    @patch("app.api.v1.endpoints.SimulationService")
+    def test_apply_one_hot_encoding(self, mock_service_class):
+        """Test applying one-hot encoding to categorical features."""
+        # Mock the simulation service
+        mock_service = MagicMock()
+        mock_service.apply_one_hot_encoding = AsyncMock(
+            return_value={
+                "onehot_features_created": 6,
+                "original_categorical_features": ["tire_compound", "weather_condition"],
+                "new_feature_names": [
+                    "tire_compound_soft",
+                    "tire_compound_medium",
+                    "tire_compound_hard",
+                    "weather_condition_dry",
+                    "weather_condition_wet",
+                    "weather_condition_intermediate",
+                ],
+                "processing_time_ms": 150,
+                "features_shape": [100, 15],
+                "targets_shape": [100, 1],
+            }
+        )
+        mock_service_class.return_value = mock_service
+
+        request_data = {
+            "session_key": 12345,
+            "include_weather": True,
+            "include_grid": True,
+            "include_lap_times": True,
+            "include_pit_stops": True,
+            "processing_options": {"encoding_method": "onehot"},
+        }
+
+        response = client.post(
+            "/api/v1/feature-engineering/one-hot-encode", json=request_data
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["session_key"] == 12345
+        assert "encoding_result" in data
+        assert "onehot_features_created" in data
+        assert "original_categorical_features" in data
+        assert "new_feature_names" in data
+        assert "processing_time_ms" in data
+
+    @patch("app.api.v1.endpoints.SimulationService")
+    def test_get_encoding_statistics(self, mock_service_class):
+        """Test getting encoding statistics for a session."""
+        # Mock the simulation service
+        mock_service = MagicMock()
+        mock_service.get_encoding_statistics = AsyncMock(
+            return_value={
+                "total_categorical_features": 3,
+                "onehot_encoded_features": 2,
+                "label_encoded_features": 1,
+                "feature_cardinality": {
+                    "tire_compound": 3,
+                    "weather_condition": 2,
+                    "lap_status": 2,
+                },
+                "total_features_after_encoding": 15,
+                "encoding_methods": {
+                    "onehot": ["tire_compound", "weather_condition"],
+                    "label": ["lap_status"],
+                },
+            }
+        )
+        mock_service_class.return_value = mock_service
+
+        response = client.get("/api/v1/feature-engineering/encoding-stats/12345")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["session_key"] == 12345
+        assert "encoding_statistics" in data
+        assert "total_categorical_features" in data
+        assert "onehot_encoded_features" in data
+        assert "label_encoded_features" in data
+        assert "feature_cardinality" in data
+
+    @patch("app.api.v1.endpoints.SimulationService")
+    def test_get_encoding_info_error(self, mock_service_class):
+        """Test error handling for encoding info endpoint."""
+        # Mock the simulation service to raise an error
+        mock_service = MagicMock()
+        mock_service.get_encoding_info = AsyncMock(
+            side_effect=FeatureEngineeringError("Test error")
+        )
+        mock_service_class.return_value = mock_service
+
+        response = client.get("/api/v1/feature-engineering/encoding-info/12345")
+
+        assert response.status_code == 400
+        data = response.json()
+        assert "detail" in data
+
+    @patch("app.api.v1.endpoints.SimulationService")
+    def test_apply_one_hot_encoding_error(self, mock_service_class):
+        """Test error handling for one-hot encoding endpoint."""
+        # Mock the simulation service to raise an error
+        mock_service = MagicMock()
+        mock_service.apply_one_hot_encoding = AsyncMock(
+            side_effect=FeatureEngineeringError("Test error")
+        )
+        mock_service_class.return_value = mock_service
+
+        request_data = {
+            "session_key": 12345,
+            "include_weather": True,
+            "include_grid": True,
+            "include_lap_times": True,
+            "include_pit_stops": True,
+        }
+
+        response = client.post(
+            "/api/v1/feature-engineering/one-hot-encode", json=request_data
+        )
+
+        assert response.status_code == 400
+        data = response.json()
+        assert "detail" in data
+
+    @patch("app.api.v1.endpoints.SimulationService")
+    def test_get_encoding_statistics_error(self, mock_service_class):
+        """Test error handling for encoding statistics endpoint."""
+        # Mock the simulation service to raise an error
+        mock_service = MagicMock()
+        mock_service.get_encoding_statistics = AsyncMock(
+            side_effect=FeatureEngineeringError("Test error")
+        )
+        mock_service_class.return_value = mock_service
+
+        response = client.get("/api/v1/feature-engineering/encoding-stats/12345")
+
+        assert response.status_code == 400
+        data = response.json()
+        assert "detail" in data

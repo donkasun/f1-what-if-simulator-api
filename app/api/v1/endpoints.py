@@ -463,43 +463,24 @@ async def get_feature_importance(
     session_key: int,
     simulation_service: SimulationService = Depends(get_simulation_service),
 ) -> dict:
-    """Get feature importance scores for a session."""
+    """Get feature importance scores for a specific session."""
     logger.info("Getting feature importance", session_key=session_key)
     try:
-        # Get session data and fit feature engineering pipeline
-        request = DataProcessingRequest(
-            session_key=session_key,
-            include_weather=True,
-            include_grid=True,
-            include_lap_times=True,
-            include_pit_stops=True,
-        )
-
-        processed_response = await simulation_service.process_session_data(request)
-
-        # Fit the feature engineering pipeline
-        features, targets, metadata = (
-            simulation_service.feature_engineering_service.fit_transform_features(
-                processed_response.processed_data, target_column="lap_time"
-            )
-        )
-
-        # Get feature importance
-        feature_importance = (
-            simulation_service.feature_engineering_service.get_feature_importance(
-                "lap_time"
-            )
-        )
-
+        importance_scores = await simulation_service.get_feature_importance(session_key)
         return {
             "session_key": session_key,
-            "feature_importance": feature_importance,
-            "feature_metadata": metadata,
-            "total_features": len(feature_importance),
+            "feature_importance": importance_scores,
+            "total_features": len(importance_scores),
+            "top_features": sorted(
+                importance_scores.items(), key=lambda x: x[1], reverse=True
+            )[:10],
         }
-
     except FeatureEngineeringError as e:
-        logger.error("Feature engineering error", error=str(e))
+        logger.error(
+            "Feature engineering error while getting feature importance",
+            session_key=session_key,
+            error=str(e),
+        )
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logger.error(
@@ -509,3 +490,116 @@ async def get_feature_importance(
             exc_info=True,
         )
         raise HTTPException(status_code=500, detail="Failed to get feature importance")
+
+
+@router.get("/feature-engineering/encoding-info/{session_key}", response_model=dict)
+async def get_encoding_info(
+    session_key: int,
+    simulation_service: SimulationService = Depends(get_simulation_service),
+) -> dict:
+    """Get information about categorical encoding for a specific session."""
+    logger.info("Getting encoding information", session_key=session_key)
+    try:
+        encoding_info = await simulation_service.get_encoding_info(session_key)
+        return {
+            "session_key": session_key,
+            "encoding_info": encoding_info,
+            "onehot_columns": encoding_info.get("onehot_columns", []),
+            "label_columns": encoding_info.get("label_columns", []),
+            "total_encoded_features": encoding_info.get("total_encoded_features", 0),
+        }
+    except FeatureEngineeringError as e:
+        logger.error(
+            "Feature engineering error while getting encoding info",
+            session_key=session_key,
+            error=str(e),
+        )
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(
+            "Failed to get encoding information",
+            session_key=session_key,
+            error=str(e),
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=500, detail="Failed to get encoding information"
+        )
+
+
+@router.post("/feature-engineering/one-hot-encode", response_model=dict)
+async def apply_one_hot_encoding(
+    request: DataProcessingRequest,
+    simulation_service: SimulationService = Depends(get_simulation_service),
+) -> dict:
+    """Apply one-hot encoding to categorical features for a session."""
+    logger.info(
+        "Applying one-hot encoding",
+        session_key=request.session_key,
+        processing_options=request.processing_options,
+    )
+    try:
+        encoding_result = await simulation_service.apply_one_hot_encoding(request)
+        return {
+            "session_key": request.session_key,
+            "encoding_result": encoding_result,
+            "onehot_features_created": encoding_result.get(
+                "onehot_features_created", 0
+            ),
+            "original_categorical_features": encoding_result.get(
+                "original_categorical_features", []
+            ),
+            "new_feature_names": encoding_result.get("new_feature_names", []),
+            "processing_time_ms": encoding_result.get("processing_time_ms", 0),
+        }
+    except FeatureEngineeringError as e:
+        logger.error(
+            "Feature engineering error while applying one-hot encoding",
+            session_key=request.session_key,
+            error=str(e),
+        )
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(
+            "Failed to apply one-hot encoding",
+            session_key=request.session_key,
+            error=str(e),
+            exc_info=True,
+        )
+        raise HTTPException(status_code=500, detail="Failed to apply one-hot encoding")
+
+
+@router.get("/feature-engineering/encoding-stats/{session_key}", response_model=dict)
+async def get_encoding_statistics(
+    session_key: int,
+    simulation_service: SimulationService = Depends(get_simulation_service),
+) -> dict:
+    """Get encoding statistics for a specific session."""
+    logger.info("Getting encoding statistics", session_key=session_key)
+    try:
+        encoding_stats = await simulation_service.get_encoding_statistics(session_key)
+        return {
+            "session_key": session_key,
+            "encoding_statistics": encoding_stats,
+            "total_categorical_features": encoding_stats.get(
+                "total_categorical_features", 0
+            ),
+            "onehot_encoded_features": encoding_stats.get("onehot_encoded_features", 0),
+            "label_encoded_features": encoding_stats.get("label_encoded_features", 0),
+            "feature_cardinality": encoding_stats.get("feature_cardinality", {}),
+        }
+    except FeatureEngineeringError as e:
+        logger.error(
+            "Feature engineering error while getting encoding statistics",
+            session_key=session_key,
+            error=str(e),
+        )
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(
+            "Failed to get encoding statistics",
+            session_key=session_key,
+            error=str(e),
+            exc_info=True,
+        )
+        raise HTTPException(status_code=500, detail="Failed to get encoding statistics")
