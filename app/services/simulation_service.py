@@ -75,51 +75,23 @@ class SimulationService:
         Returns:
             List of driver information
         """
-        logger.info("Fetching mock drivers for season", season=season)
-
-        # Mock driver data for development
-        mock_drivers = [
-            DriverResponse(
-                driver_id=1,
-                name="Max Verstappen",
-                code="VER",
-                team="Red Bull Racing",
-                nationality="Dutch",
-            ),
-            DriverResponse(
-                driver_id=2,
-                name="Lewis Hamilton",
-                code="HAM",
-                team="Mercedes",
-                nationality="British",
-            ),
-            DriverResponse(
-                driver_id=3,
-                name="Charles Leclerc",
-                code="LEC",
-                team="Ferrari",
-                nationality="Monegasque",
-            ),
-            DriverResponse(
-                driver_id=4,
-                name="Lando Norris",
-                code="NOR",
-                team="McLaren",
-                nationality="British",
-            ),
-            DriverResponse(
-                driver_id=5,
-                name="Carlos Sainz",
-                code="SAI",
-                team="Ferrari",
-                nationality="Spanish",
-            ),
-        ]
-
-        logger.info(
-            "Successfully fetched mock drivers", season=season, count=len(mock_drivers)
-        )
-        return mock_drivers
+        logger.info("Fetching drivers for season", season=season)
+        async with self.openf1_client as client:
+            drivers_data = await client.get_drivers(season=season)
+            drivers = [
+                DriverResponse(
+                    driver_id=driver.get("driver_number"),
+                    name=driver.get("full_name"),
+                    code=driver.get("name_acronym"),
+                    team=driver.get("team_name"),
+                    nationality=driver.get("country_code"),
+                )
+                for driver in drivers_data
+            ]
+            logger.info(
+                "Successfully fetched drivers", season=season, count=len(drivers)
+            )
+            return drivers
 
     @alru_cache(maxsize=50)
     async def get_tracks(self, season: int) -> List[TrackResponse]:
@@ -132,51 +104,21 @@ class SimulationService:
         Returns:
             List of track information
         """
-        logger.info("Fetching mock tracks for season", season=season)
-
-        # Mock track data for development
-        mock_tracks = [
-            TrackResponse(
-                track_id=1,
-                name="Monaco Grand Prix",
-                country="Monaco",
-                circuit_length=3.337,
-                number_of_laps=78,
-            ),
-            TrackResponse(
-                track_id=2,
-                name="Silverstone Circuit",
-                country="United Kingdom",
-                circuit_length=5.891,
-                number_of_laps=52,
-            ),
-            TrackResponse(
-                track_id=3,
-                name="Spa-Francorchamps",
-                country="Belgium",
-                circuit_length=7.004,
-                number_of_laps=44,
-            ),
-            TrackResponse(
-                track_id=4,
-                name="Monza",
-                country="Italy",
-                circuit_length=5.793,
-                number_of_laps=53,
-            ),
-            TrackResponse(
-                track_id=5,
-                name="Suzuka",
-                country="Japan",
-                circuit_length=5.807,
-                number_of_laps=53,
-            ),
-        ]
-
-        logger.info(
-            "Successfully fetched mock tracks", season=season, count=len(mock_tracks)
-        )
-        return mock_tracks
+        logger.info("Fetching tracks for season", season=season)
+        async with self.openf1_client as client:
+            tracks_data = await client.get_tracks(season=season)
+            tracks = [
+                TrackResponse(
+                    track_id=track.get("track_id"),
+                    name=track.get("name"),
+                    country=track.get("country"),
+                    circuit_length=track.get("circuit_length"),
+                    number_of_laps=track.get("number_of_laps"),
+                )
+                for track in tracks_data
+            ]
+            logger.info("Successfully fetched tracks", season=season, count=len(tracks))
+            return tracks
 
     async def get_sessions(self, season: int) -> List[SessionResponse]:
         """Get all sessions for a specific season."""
