@@ -7,7 +7,7 @@ including ML model integration and result caching.
 
 import time
 import uuid
-from datetime import datetime, UTC
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 import structlog
@@ -16,7 +16,6 @@ from async_lru import alru_cache
 from app.core.exceptions import (
     DriverNotFoundError,
     InvalidSimulationParametersError,
-    FeatureEngineeringError,
 )
 from app.external.openf1_client import OpenF1Client
 from app.models.model_loader import ModelLoader
@@ -505,7 +504,7 @@ class SimulationService:
                 confidence_score=confidence_score,
                 weather_conditions=request.weather_conditions or "dry",
                 car_setup=request.car_setup or {},
-                created_at=datetime.now(UTC),
+                created_at=datetime.now(timezone.utc),
                 processing_time_ms=processing_time_ms,
             )
 
@@ -663,31 +662,8 @@ class SimulationService:
             )
         )
 
-        # Get encoding information
-        encoding_info = {
-            "onehot_columns": self.feature_engineering_service.onehot_columns,
-            "label_columns": self.feature_engineering_service.label_columns,
-            "total_encoded_features": len(
-                self.feature_engineering_service.onehot_columns
-            )
-            + len(self.feature_engineering_service.label_columns),
-            "onehot_encoders": {
-                col: {
-                    "categories": encoder.categories_[0].tolist(),
-                    "n_features": len(encoder.categories_[0]),
-                }
-                for col, encoder in self.feature_engineering_service.onehot_encoders.items()
-            },
-            "label_encoders": {
-                col: {
-                    "classes": encoder.classes_.tolist(),
-                    "n_classes": len(encoder.classes_),
-                }
-                for col, encoder in self.feature_engineering_service.label_encoders.items()
-            },
-        }
-
-        return encoding_info
+        # Get encoding information from feature engineering service
+        return self.feature_engineering_service.get_encoding_info()
 
     async def apply_one_hot_encoding(
         self, request: DataProcessingRequest
@@ -715,28 +691,17 @@ class SimulationService:
             )
         )
 
-        # Get encoding information
-        encoding_info = await self.get_encoding_info(request.session_key)
-
-        # Calculate new feature names from one-hot encoding
-        new_feature_names = []
-        for col in self.feature_engineering_service.onehot_columns:
-            if col in self.feature_engineering_service.onehot_encoders:
-                encoder = self.feature_engineering_service.onehot_encoders[col]
-                feature_names = [f"{col}_{cat}" for cat in encoder.categories_[0]]
-                new_feature_names.extend(feature_names)
+        # Apply one-hot encoding using feature engineering service
+        encoding_result = self.feature_engineering_service.apply_one_hot_encoding(
+            self.feature_engineering_service.onehot_columns
+        )
 
         processing_time_ms = int((time.time() - start_time) * 1000)
 
-        encoding_result = {
-            "onehot_features_created": len(new_feature_names),
-            "original_categorical_features": self.feature_engineering_service.onehot_columns,
-            "new_feature_names": new_feature_names,
-            "encoding_info": encoding_info,
-            "processing_time_ms": processing_time_ms,
-            "features_shape": features.shape,
-            "targets_shape": targets.shape,
-        }
+        # Add processing time to the result
+        encoding_result["processing_time_ms"] = processing_time_ms
+        encoding_result["features_shape"] = features.shape
+        encoding_result["targets_shape"] = targets.shape
 
         return encoding_result
 
@@ -770,37 +735,8 @@ class SimulationService:
             )
         )
 
-        # Calculate feature cardinality
-        feature_cardinality = {}
-        for col in self.feature_engineering_service.categorical_columns:
-            if col in processed_response.processed_data:
-                unique_values = set()
-                for point in processed_response.processed_data:
-                    if hasattr(point, col):
-                        value = getattr(point, col)
-                        if value is not None:
-                            unique_values.add(str(value))
-                feature_cardinality[col] = len(unique_values)
-
-        encoding_stats = {
-            "total_categorical_features": len(
-                self.feature_engineering_service.categorical_columns
-            ),
-            "onehot_encoded_features": len(
-                self.feature_engineering_service.onehot_columns
-            ),
-            "label_encoded_features": len(
-                self.feature_engineering_service.label_columns
-            ),
-            "feature_cardinality": feature_cardinality,
-            "total_features_after_encoding": features.shape[1],
-            "encoding_methods": {
-                "onehot": self.feature_engineering_service.onehot_columns,
-                "label": self.feature_engineering_service.label_columns,
-            },
-        }
-
-        return encoding_stats
+        # Get encoding statistics from feature engineering service
+        return self.feature_engineering_service.get_encoding_statistics()
 
     async def process_session_data(
         self, request: DataProcessingRequest
@@ -977,14 +913,18 @@ class SimulationService:
                 return DataProcessingResponse(
                     session_key=request.session_key,
                     session_name=session_info.get("session_name", "Unknown Session"),
-                    track_name=session_info.get("location", "Unknown Track"),
-                    country=session_info.get("country_name", "Unknown"),
+                    track_name=session_info.get(
+                        "track_name", session_info.get("location", "Unknown Track")
+                    ),
+                    country=session_info.get(
+                        "country_name", session_info.get("country", "Unknown")
+                    ),
                     year=session_info.get("year", 2024),
                     processing_summary=processing_summary,
                     processed_data=processed_data_points,
                     feature_columns=feature_columns,
                     target_columns=target_columns,
-                    created_at=datetime.now(UTC),
+                    created_at=datetime.now(timezone.utc),
                 )
 
         except Exception as e:
@@ -1218,51 +1158,14 @@ class SimulationService:
         )
 
         # Get the specific encoder for the requested feature
-        if request.encoding_type == "onehot":
-            if (
-                request.feature_name
-                not in self.feature_engineering_service.onehot_encoders
-            ):
-                raise FeatureEngineeringError(
-                    f"One-hot encoder not found for feature: {request.feature_name}"
-                )
-            encoder = self.feature_engineering_service.onehot_encoders[
-                request.feature_name
-            ]
-            categories = list(encoder.categories_[0])
-            encoded_feature_names = [
-                f"{request.feature_name}_{cat}" for cat in categories
-            ]
+        encoding_result = self.feature_engineering_service.encode_categorical_feature(
+            request.feature_name, request.encoding_type
+        )
 
-            # Create feature mappings
-            feature_mappings = {}
-            for i, category in enumerate(categories):
-                encoding_vector = [0] * len(categories)
-                encoding_vector[i] = 1
-                feature_mappings[f"{request.feature_name}_{category}"] = encoding_vector
-
-        elif request.encoding_type == "label":
-            if (
-                request.feature_name
-                not in self.feature_engineering_service.label_encoders
-            ):
-                raise FeatureEngineeringError(
-                    f"Label encoder not found for feature: {request.feature_name}"
-                )
-            encoder = self.feature_engineering_service.label_encoders[
-                request.feature_name
-            ]
-            categories = list(encoder.classes_)
-            encoded_feature_names = [request.feature_name]
-
-            # Create feature mappings for label encoding
-            feature_mappings = {
-                category: encoder.transform([category])[0] for category in categories
-            }
-        else:
-            raise FeatureEngineeringError(
-                f"Unsupported encoding type: {request.encoding_type}"
-            )
+        categories = encoding_result["categories"]
+        feature_mappings = encoding_result["feature_mappings"]
+        encoded_feature_names = encoding_result["encoded_feature_names"]
+        validation_passed = encoding_result["validation_passed"]
 
         # Create encoding metadata
         encoding_metadata = {
@@ -1270,19 +1173,8 @@ class SimulationService:
             "sparse_encoding": False,
             "handle_unknown": "ignore",
             "encoding_version": "1.0",
-            "encoding_timestamp": datetime.utcnow().isoformat(),
+            "encoding_timestamp": datetime.now(timezone.utc).isoformat(),
         }
-
-        # Perform validation if requested
-        validation_passed = True
-        if request.include_validation:
-            try:
-                # Basic validation: check if categories are consistent
-                validation_passed = len(categories) > 0 and all(
-                    isinstance(cat, str) for cat in categories
-                )
-            except Exception:
-                validation_passed = False
 
         return CategoricalMappingResponse(
             session_key=request.session_key,
@@ -1293,7 +1185,7 @@ class SimulationService:
             encoded_feature_names=encoded_feature_names,
             encoding_metadata=encoding_metadata,
             validation_passed=validation_passed,
-            created_at=datetime.utcnow(),
+            created_at=datetime.now(timezone.utc),
         )
 
     async def validate_categorical_encodings(
@@ -1322,81 +1214,23 @@ class SimulationService:
             )
         )
 
-        # Define expected categorical features for FWI-BE-106
-        expected_categorical_features = [
-            "weather_condition",
-            "tire_compound",
-            "track_type",
-            "driver_team",
-            "lap_status",
-        ]
+        # Use the feature engineering service to validate encodings
+        validation_result = (
+            self.feature_engineering_service.validate_categorical_encodings()
+        )
 
-        feature_validations = {}
-        encoding_consistency = {}
-        validation_errors = []
-
-        # Validate each categorical feature
-        for feature_name in expected_categorical_features:
-            try:
-                # Check if feature exists in one-hot encoders
-                if feature_name in self.feature_engineering_service.onehot_encoders:
-                    encoder = self.feature_engineering_service.onehot_encoders[
-                        feature_name
-                    ]
-
-                    # Validate encoder state
-                    if (
-                        hasattr(encoder, "categories_")
-                        and len(encoder.categories_[0]) > 0
-                    ):
-                        feature_validations[feature_name] = True
-                        encoding_consistency[feature_name] = (
-                            "consistent_onehot_encoding"
-                        )
-                    else:
-                        feature_validations[feature_name] = False
-                        encoding_consistency[feature_name] = "invalid_onehot_encoding"
-                        validation_errors.append(
-                            f"Invalid one-hot encoder for {feature_name}"
-                        )
-
-                # Check if feature exists in label encoders
-                elif feature_name in self.feature_engineering_service.label_encoders:
-                    encoder = self.feature_engineering_service.label_encoders[
-                        feature_name
-                    ]
-
-                    # Validate encoder state
-                    if hasattr(encoder, "classes_") and len(encoder.classes_) > 0:
-                        feature_validations[feature_name] = True
-                        encoding_consistency[feature_name] = "consistent_label_encoding"
-                    else:
-                        feature_validations[feature_name] = False
-                        encoding_consistency[feature_name] = "invalid_label_encoding"
-                        validation_errors.append(
-                            f"Invalid label encoder for {feature_name}"
-                        )
-                else:
-                    # Feature not found in any encoder
-                    feature_validations[feature_name] = False
-                    encoding_consistency[feature_name] = "missing_encoding"
-                    validation_errors.append(f"No encoder found for {feature_name}")
-
-            except Exception as e:
-                feature_validations[feature_name] = False
-                encoding_consistency[feature_name] = "encoding_error"
-                validation_errors.append(f"Error validating {feature_name}: {str(e)}")
+        feature_validations = validation_result["feature_validations"]
+        encoding_consistency = validation_result["encoding_consistency"]
+        validation_errors = validation_result["validation_errors"]
 
         # Overall validation status
-        validation_passed = (
-            all(feature_validations.values()) and len(validation_errors) == 0
-        )
+        validation_passed = validation_result["validation_passed"]
 
         processing_time_ms = int((time.time() - start_time) * 1000)
 
         return EncodingValidationResponse(
             session_key=request.session_key,
-            total_features_validated=len(expected_categorical_features),
+            total_features_validated=validation_result["total_features_validated"],
             validation_passed=validation_passed,
             feature_validations=feature_validations,
             encoding_consistency=encoding_consistency,
