@@ -536,8 +536,8 @@ class SimulationService:
                     f"Track with ID {request.track_id} not found"
                 )
 
-            # Get mock historical data for the driver and track
-            historical_data = self._get_mock_historical_data(
+            # Get historical data for the driver and track
+            historical_data = await self._get_historical_data(
                 driver_id=request.driver_id,
                 track_id=request.track_id,
                 season=request.season,
@@ -1174,25 +1174,11 @@ class SimulationService:
         # Map simulation data to trained model's expected features
         # Our trained model expects: [lap_number, driver_number, i2_speed, st_speed]
 
-        # Use a reasonable lap number for simulation (middle of race)
-        lap_number = 25  # Assume mid-race for simulation
-
-        # Use driver_id as driver_number
+        # Use historical data to prepare features
+        lap_number = historical_data.get("total_laps", 50) // 2  # Assume mid-race
         driver_number = request.driver_id
-
-        # Estimate speeds based on historical data and track characteristics
-        # These are rough estimates since we don't have real speed trap data during simulation
-        base_i2_speed = 240.0  # Reasonable intermediate speed baseline
-        base_st_speed = 300.0  # Reasonable speed trap baseline
-
-        # Adjust speeds based on historical performance
-        performance_factor = historical_data.get("consistency_score", 0.85)
-        i2_speed = base_i2_speed * (
-            0.9 + 0.2 * performance_factor
-        )  # Scale based on performance
-        st_speed = base_st_speed * (
-            0.9 + 0.2 * performance_factor
-        )  # Scale based on performance
+        i2_speed = historical_data.get("avg_i2_speed", 240.0)
+        st_speed = historical_data.get("avg_st_speed", 300.0)
 
         features = [
             lap_number,  # lap_number
@@ -1226,6 +1212,23 @@ class SimulationService:
         else:
             return 0.40
 
+    async def _get_historical_data(
+        self, driver_id: int, track_id: int, season: int
+    ) -> dict:
+        """
+        Get historical data for a driver and track.
+
+        Args:
+            driver_id: Driver identifier
+            track_id: Track identifier
+            season: F1 season year
+
+        Returns:
+            Historical performance data
+        """
+        # TODO: Implement real data fetching from OpenF1Client
+        return self._get_mock_historical_data(driver_id, track_id, season)
+
     def _get_mock_historical_data(
         self, driver_id: int, track_id: int, season: int
     ) -> dict:
@@ -1252,6 +1255,9 @@ class SimulationService:
             "qualifying_position": max(1, driver_id),
             "weather_conditions": ["dry", "wet", "intermediate"],
             "tire_usage": {"soft": 0.3, "medium": 0.4, "hard": 0.3},
+            "total_laps": 50,
+            "avg_i2_speed": 240.0 + (driver_id * 1.5),
+            "avg_st_speed": 300.0 + (driver_id * 2.0),
         }
 
     # FWI-BE-106: Enhanced Categorical Encoding Methods
