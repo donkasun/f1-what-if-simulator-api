@@ -91,6 +91,9 @@ class OpenF1Client:
         """
         Get historical performance data for a driver at a specific track.
 
+        This function will first find the relevant race session for the given
+        track and season, then fetch the lap times for the specified driver.
+
         Args:
             driver_id: Driver identifier
             track_id: Track identifier
@@ -100,10 +103,30 @@ class OpenF1Client:
             Historical performance data
 
         Raises:
-            OpenF1APIError: If API call fails
+            OpenF1APIError: If API call fails or no session is found
         """
-        endpoint = "/lap_times"
-        params = {"driver_id": driver_id, "circuit_id": track_id, "year": season}
+        # First, find the session_key for the race at the given track and season
+        sessions = await self.get_sessions(season)
+        session_key = None
+        for session in sessions:
+            if (
+                session.get("meeting_key") == track_id
+                and session.get("session_type") == "Race"
+            ):
+                session_key = session.get("session_key")
+                break
+
+        if not session_key:
+            logger.warning(
+                "No race session found for track and season",
+                track_id=track_id,
+                season=season,
+            )
+            return self._process_historical_data([])
+
+        # Now, fetch lap times using the found session_key
+        endpoint = "/v1/laps"
+        params = {"session_key": session_key, "driver_number": driver_id}
 
         lap_times = await self._make_request("GET", endpoint, params=params)
 

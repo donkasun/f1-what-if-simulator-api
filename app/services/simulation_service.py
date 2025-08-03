@@ -536,8 +536,8 @@ class SimulationService:
                     f"Track with ID {request.track_id} not found"
                 )
 
-            # Get mock historical data for the driver and track
-            historical_data = self._get_mock_historical_data(
+            # Get historical data for the driver and track
+            historical_data = await self._get_historical_data(
                 driver_id=request.driver_id,
                 track_id=request.track_id,
                 season=request.season,
@@ -1166,7 +1166,7 @@ class SimulationService:
 
         Args:
             request: Simulation request
-            historical_data: Historical performance data
+            historical_data: Historical performance data from OpenF1Client
 
         Returns:
             Feature vector for prediction (4 features)
@@ -1174,25 +1174,15 @@ class SimulationService:
         # Map simulation data to trained model's expected features
         # Our trained model expects: [lap_number, driver_number, i2_speed, st_speed]
 
-        # Use a reasonable lap number for simulation (middle of race)
-        lap_number = 25  # Assume mid-race for simulation
-
-        # Use driver_id as driver_number
+        # Use historical data to prepare features
+        # 'data_points' from the client represents the number of historical laps found.
+        lap_number = historical_data.get("data_points", 50) // 2  # Assume mid-race
         driver_number = request.driver_id
 
-        # Estimate speeds based on historical data and track characteristics
-        # These are rough estimates since we don't have real speed trap data during simulation
-        base_i2_speed = 240.0  # Reasonable intermediate speed baseline
-        base_st_speed = 300.0  # Reasonable speed trap baseline
-
-        # Adjust speeds based on historical performance
-        performance_factor = historical_data.get("consistency_score", 0.85)
-        i2_speed = base_i2_speed * (
-            0.9 + 0.2 * performance_factor
-        )  # Scale based on performance
-        st_speed = base_st_speed * (
-            0.9 + 0.2 * performance_factor
-        )  # Scale based on performance
+        # TODO: FWI-BE-111 - Enhance OpenF1Client to fetch speed trap data.
+        # For now, using default values as the current client does not provide them.
+        i2_speed = 240.0
+        st_speed = 300.0
 
         features = [
             lap_number,  # lap_number
@@ -1226,11 +1216,11 @@ class SimulationService:
         else:
             return 0.40
 
-    def _get_mock_historical_data(
+    async def _get_historical_data(
         self, driver_id: int, track_id: int, season: int
     ) -> dict:
         """
-        Get mock historical data for development purposes.
+        Get historical data for a driver and track using the OpenF1Client.
 
         Args:
             driver_id: Driver identifier
@@ -1238,21 +1228,18 @@ class SimulationService:
             season: F1 season year
 
         Returns:
-            Mock historical performance data
+            Historical performance data
         """
-        # Generate realistic mock data based on driver and track
-        base_lap_time = 75.0 + (driver_id * 0.5) + (track_id * 1.2)
-
-        return {
-            "avg_lap_time": base_lap_time,
-            "best_lap_time": base_lap_time - 2.0,
-            "consistency_score": 0.85 + (driver_id * 0.02),
-            "data_points": 25 + (driver_id * 5),
-            "last_race_position": max(1, driver_id),
-            "qualifying_position": max(1, driver_id),
-            "weather_conditions": ["dry", "wet", "intermediate"],
-            "tire_usage": {"soft": 0.3, "medium": 0.4, "hard": 0.3},
-        }
+        logger.info(
+            "Fetching historical data from OpenF1Client",
+            driver_id=driver_id,
+            track_id=track_id,
+            season=season,
+        )
+        async with self.openf1_client as client:
+            return await client.get_historical_data(  # type: ignore
+                driver_id=driver_id, track_id=track_id, season=season
+            )
 
     # FWI-BE-106: Enhanced Categorical Encoding Methods
 
