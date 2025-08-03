@@ -7,6 +7,11 @@ on:
       - main
       - develop
 
+permissions:
+  issues: write
+  pull-requests: write
+  contents: read
+
 jobs:
   move-issue-to-review:
     runs-on: ubuntu-latest
@@ -65,24 +70,29 @@ jobs:
             if gh issue view "$CLEAN_ISSUE" --json projectCards > /dev/null 2>&1; then
               echo "Issue $CLEAN_ISSUE found, checking project status..."
 
-              # Get current status from project
-              CURRENT_STATUS=$(gh issue view "$CLEAN_ISSUE" --json projectCards --jq '.projectCards[0].column.name // "Not in project"')
-              echo "Current status: $CURRENT_STATUS"
+                            # Check current labels
+              CURRENT_LABELS=$(gh issue view "$CLEAN_ISSUE" --json labels --jq '.labels[].name' 2>/dev/null || echo "")
+              echo "Current labels: $CURRENT_LABELS"
 
-              # Only move to Review if not already in Review or Done
-              if [ "$CURRENT_STATUS" != "Review" ] && [ "$CURRENT_STATUS" != "Done" ]; then
+              # Only move to Review if not already labeled as In Review or Done
+              if ! echo "$CURRENT_LABELS" | grep -q "In Review" && ! echo "$CURRENT_LABELS" | grep -q "Done"; then
                 echo "Moving issue $CLEAN_ISSUE to Review status..."
 
-                # Move to Review column
-                gh project item-edit --id "$CLEAN_ISSUE" --field-name "Status" --single-select-option "Review" || {
-                  echo "⚠️ Could not move issue $CLEAN_ISSUE to Review status"
-                  echo "This might be because the issue is not in the project or the Review column doesn't exist"
+                # Move to Review column using GitHub CLI
+                gh issue edit "$CLEAN_ISSUE" --add-label "In Review" || {
+                  echo "⚠️ Could not add 'In Review' label to issue $CLEAN_ISSUE"
+                  echo "This might be because the issue doesn't exist or the label doesn't exist"
+                }
+
+                # Try to update project status if available
+                gh project item-edit --id "$CLEAN_ISSUE" --field-name "Status" --single-select-option "Review" 2>/dev/null || {
+                  echo "ℹ️ Could not update project status for issue $CLEAN_ISSUE (this is normal if not using GitHub Projects)"
                 }
 
                 echo "✅ Successfully moved issue $CLEAN_ISSUE to Review status"
-              else
-                echo "ℹ️ Issue $CLEAN_ISSUE is already in $CURRENT_STATUS status, skipping"
-              fi
+                              else
+                  echo "ℹ️ Issue $CLEAN_ISSUE is already labeled as In Review or Done, skipping"
+                fi
             else
               echo "⚠️ Issue $CLEAN_ISSUE not found or not accessible"
             fi
