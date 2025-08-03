@@ -1,0 +1,130 @@
+name: Branch Issue Management
+
+on:
+  push:
+    branches-ignore:
+      - main
+      - develop
+      - 'releases/**'
+
+jobs:
+  move-issue-to-in-progress:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Extract issue numbers from branch name
+        id: extract-issues
+        run: |
+          # Extract issue numbers from branch name
+          BRANCH_NAME="${{ github.ref_name }}"
+
+          echo "Branch name: $BRANCH_NAME"
+
+          # Patterns to match issue references in branch names
+          PATTERNS=(
+            "FWI-BE-[0-9]+"
+            "feature/FWI-BE-[0-9]+"
+            "bugfix/FWI-BE-[0-9]+"
+            "hotfix/FWI-BE-[0-9]+"
+            "issue-[0-9]+"
+            "feature/issue-[0-9]+"
+            "bugfix/issue-[0-9]+"
+            "hotfix/issue-[0-9]+"
+          )
+
+          ISSUES=""
+
+          for pattern in "${PATTERNS[@]}"; do
+            if echo "$BRANCH_NAME" | grep -o "$pattern" > /dev/null; then
+              ISSUES="$ISSUES $(echo "$BRANCH_NAME" | grep -o "$pattern")"
+            fi
+          done
+
+          # Remove duplicates and clean up
+          ISSUES=$(echo "$ISSUES" | tr ' ' '\n' | sort -u | tr '\n' ' ' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+
+          echo "Found issues: $ISSUES"
+          echo "issues=$ISSUES" >> $GITHUB_OUTPUT
+
+      - name: Move issues to In Progress status
+        if: steps.extract-issues.outputs.issues != ''
+        run: |
+          ISSUES="${{ steps.extract-issues.outputs.issues }}"
+
+          for issue in $ISSUES; do
+            # Clean up issue reference (extract just the number)
+            CLEAN_ISSUE=$(echo "$issue" | sed 's/.*FWI-BE-//' | sed 's/.*issue-//' | sed 's/[^0-9].*//')
+
+            echo "Processing issue: $CLEAN_ISSUE"
+
+            # Check if issue exists and is in a project
+            if gh issue view "$CLEAN_ISSUE" --json projectCards > /dev/null 2>&1; then
+              echo "Issue $CLEAN_ISSUE found, checking project status..."
+
+              # Get current status from project
+              CURRENT_STATUS=$(gh issue view "$CLEAN_ISSUE" --json projectCards --jq '.projectCards[0].column.name // "Not in project"')
+              echo "Current status: $CURRENT_STATUS"
+
+              # Only move to In Progress if not already in In Progress, Review, or Done
+              if [ "$CURRENT_STATUS" != "In Progress" ] && [ "$CURRENT_STATUS" != "Review" ] && [ "$CURRENT_STATUS" != "Done" ]; then
+                echo "Moving issue $CLEAN_ISSUE to In Progress status..."
+
+                # Move to In Progress column
+                gh project item-edit --id "$CLEAN_ISSUE" --field-name "Status" --single-select-option "In Progress" || {
+                  echo "⚠️ Could not move issue $CLEAN_ISSUE to In Progress status"
+                  echo "This might be because the issue is not in the project or the In Progress column doesn't exist"
+                }
+
+                echo "✅ Successfully moved issue $CLEAN_ISSUE to In Progress status"
+              else
+                echo "ℹ️ Issue $CLEAN_ISSUE is already in $CURRENT_STATUS status, skipping"
+              fi
+            else
+              echo "⚠️ Issue $CLEAN_ISSUE not found or not accessible"
+            fi
+          done
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create issue comment about branch creation
+        if: steps.extract-issues.outputs.issues != ''
+        run: |
+          ISSUES="${{ steps.extract-issues.outputs.issues }}"
+          BRANCH_NAME="${{ github.ref_name }}"
+
+          for issue in $ISSUES; do
+            # Clean up issue reference (extract just the number)
+            CLEAN_ISSUE=$(echo "$issue" | sed 's/.*FWI-BE-//' | sed 's/.*issue-//' | sed 's/[^0-9].*//')
+
+            COMMENT="## 🌿 Branch Created for Development
+
+            A new branch has been created for this issue:
+
+            **Branch:** \`$BRANCH_NAME\`
+            **Created by:** @${{ github.actor }}
+            **Repository:** ${{ github.repository }}
+
+            The issue has been moved to **In Progress** status.
+
+            ---
+            *This action was performed automatically when the branch was created.*"
+
+            gh issue comment "$CLEAN_ISSUE" --body "$COMMENT" || {
+              echo "⚠️ Could not add comment to issue $CLEAN_ISSUE"
+            }
+          done
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Log branch creation (no issues found)
+        if: steps.extract-issues.outputs.issues == ''
+        run: |
+          BRANCH_NAME="${{ github.ref_name }}"
+          echo "ℹ️ Branch '$BRANCH_NAME' created but no issue numbers found in branch name"
+          echo "To automatically move issues to 'In Progress' status, use branch names like:"
+          echo "  - feature/FWI-BE-123"
+          echo "  - bugfix/FWI-BE-456"
+          echo "  - issue-789"
+          echo "  - feature/issue-101"
