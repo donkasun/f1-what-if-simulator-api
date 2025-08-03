@@ -689,7 +689,7 @@ class SimulationService:
             "lap_time"
         )
 
-        return feature_importance
+        return feature_importance  # type: ignore
 
     async def get_encoding_info(self, session_key: int) -> Dict[str, Any]:
         """
@@ -1141,6 +1141,8 @@ class SimulationService:
                 weather_condition=(
                     weather_data.get("weather_condition") if weather_data else "unknown"
                 ),
+                track_type=None,  # TODO: Get from track data
+                driver_team=None,  # TODO: Get from driver data
                 pit_stop_count=pit_stop_count,
                 total_pit_time=total_pit_time,
                 lap_status=lap_data.get("lap_status", "valid"),
