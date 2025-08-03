@@ -20,7 +20,7 @@ class OpenF1Client:
 
     def __init__(self):
         """Initialize the OpenF1 client."""
-        self.base_url = settings.openf1_api_url
+        self.base_url = "https://api.openf1.org/v1"
         self.timeout = settings.openf1_api_timeout
         self._client: Optional[httpx.AsyncClient] = None
 
@@ -61,8 +61,60 @@ class OpenF1Client:
         Raises:
             OpenF1APIError: If API call fails
         """
-        endpoint = "/drivers"
+        meetings = await self.get_meetings(season)
+        all_drivers = {}
+        for meeting in meetings:
+            meeting_key = meeting.get("meeting_key")
+            if meeting_key:
+                sessions = await self.get_sessions(meeting_key)
+                for session in sessions:
+                    session_key = session.get("session_key")
+                    if session_key:
+                        endpoint = "/drivers"
+                        params = {"session_key": session_key}
+                        drivers_data = await self._make_request(
+                            "GET", endpoint, params=params
+                        )
+                        for driver in drivers_data:
+                            all_drivers[driver.get("driver_number")] = driver
+
+        return list(all_drivers.values())
+
+    @alru_cache(maxsize=50)
+    async def get_meetings(self, season: int) -> List[Dict]:
+        """
+        Get all meetings for a specific season.
+
+        Args:
+            season: F1 season year
+
+        Returns:
+            List of meeting data
+
+        Raises:
+            OpenF1APIError: If API call fails
+        """
+        endpoint = "/meetings"
         params = {"year": season}
+
+        return await self._make_request("GET", endpoint, params=params)
+
+    @alru_cache(maxsize=50)
+    async def get_sessions(self, meeting_key: int) -> List[Dict]:
+        """
+        Get all sessions for a specific meeting.
+
+        Args:
+            meeting_key: The unique identifier for the meeting.
+
+        Returns:
+            List of session data
+
+        Raises:
+            OpenF1APIError: If API call fails
+        """
+        endpoint = "/sessions"
+        params = {"meeting_key": meeting_key}
 
         return await self._make_request("GET", endpoint, params=params)
 
@@ -80,10 +132,20 @@ class OpenF1Client:
         Raises:
             OpenF1APIError: If API call fails
         """
-        endpoint = "/circuits"
-        params = {"year": season}
+        meetings_data = await self.get_meetings(season)
 
-        return await self._make_request("GET", endpoint, params=params)
+        tracks = []
+        for meeting in meetings_data:
+            tracks.append(
+                {
+                    "track_id": meeting.get("circuit_key"),
+                    "name": meeting.get("circuit_short_name"),
+                    "country": meeting.get("country_name"),
+                    "circuit_length": None,  # Not available in this endpoint
+                    "number_of_laps": None,  # Not available in this endpoint
+                }
+            )
+        return tracks
 
     async def get_historical_data(
         self, driver_id: int, track_id: int, season: int
@@ -102,8 +164,25 @@ class OpenF1Client:
         Raises:
             OpenF1APIError: If API call fails
         """
-        endpoint = "/lap_times"
-        params = {"driver_id": driver_id, "circuit_id": track_id, "year": season}
+        meetings = await self.get_meetings(season)
+        session_key = None
+        for meeting in meetings:
+            if meeting.get("circuit_key") == track_id:
+                sessions = await self.get_sessions(meeting.get("meeting_key"))
+                for session in sessions:
+                    if session.get("session_name") == "Race":
+                        session_key = session.get("session_key")
+                        break
+            if session_key:
+                break
+
+        if not session_key:
+            raise OpenF1APIError(
+                f"No race session found for track {track_id} in {season}"
+            )
+
+        endpoint = "/laps"
+        params = {"session_key": session_key, "driver_number": driver_id}
 
         lap_times = await self._make_request("GET", endpoint, params=params)
 
@@ -225,23 +304,9 @@ class OpenF1Client:
         # Extract lap times (assuming they're in seconds)
         times = []
         for lap in lap_times:
-            if "lap_time" in lap and lap["lap_time"]:
+            if "lap_duration" in lap and lap["lap_duration"]:
                 try:
-                    # Convert lap time string to seconds if needed
-                    lap_time = lap["lap_time"]
-                    if isinstance(lap_time, str):
-                        # Parse time format like "1:23.456"
-                        parts = lap_time.split(":")
-                        if len(parts) == 2:
-                            minutes = int(parts[0])
-                            seconds = float(parts[1])
-                            lap_time_seconds = minutes * 60 + seconds
-                        else:
-                            lap_time_seconds = float(lap_time)
-                    else:
-                        lap_time_seconds = float(lap_time)
-
-                    times.append(lap_time_seconds)
+                    times.append(float(lap["lap_duration"]))
                 except (ValueError, TypeError):
                     continue
 
