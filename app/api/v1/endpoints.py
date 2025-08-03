@@ -2,7 +2,7 @@
 API v1 endpoints for F1 What-If Simulator.
 """
 
-from typing import List
+from typing import List, Any
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -52,12 +52,12 @@ async def health_check() -> dict:
 async def get_drivers(
     season: int = Query(..., description="F1 season year"),
     simulation_service: SimulationService = Depends(get_simulation_service),
-) -> List[DriverResponse]:
+) -> Any:
     """Get all drivers for a specific season."""
     logger.info("Fetching drivers", season=season)
     try:
         drivers = await simulation_service.get_drivers(season)
-        return drivers  # type: ignore
+        return drivers
     except Exception as e:
         logger.error(
             "Failed to fetch drivers", season=season, error=str(e), exc_info=True
@@ -69,12 +69,12 @@ async def get_drivers(
 async def get_tracks(
     season: int = Query(..., description="F1 season year"),
     simulation_service: SimulationService = Depends(get_simulation_service),
-) -> List[TrackResponse]:
+) -> Any:
     """Get all tracks for a specific season."""
     logger.info("Fetching tracks", season=season)
     try:
         tracks = await simulation_service.get_tracks(season)
-        return tracks  # type: ignore
+        return tracks
     except Exception as e:
         logger.error(
             "Failed to fetch tracks", season=season, error=str(e), exc_info=True

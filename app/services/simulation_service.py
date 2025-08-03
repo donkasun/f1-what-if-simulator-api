@@ -654,7 +654,7 @@ class SimulationService:
             )
             return False
 
-    async def get_feature_importance(self, session_key: int) -> Dict[str, float]:
+    async def get_feature_importance(self, session_key: int) -> Dict[str, Any]:
         """
         Get feature importance scores for a specific session.
 
