@@ -3,7 +3,7 @@ Pydantic schemas for API request/response validation.
 """
 
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -626,6 +626,10 @@ class ProcessedDataPoint(BaseModel):
     )
     humidity: Optional[float] = Field(None, description="Humidity percentage")
     weather_condition: Optional[str] = Field(None, description="Weather condition")
+    track_type: Optional[str] = Field(
+        None, description="Track type (street/permanent/temporary)"
+    )
+    driver_team: Optional[str] = Field(None, description="Driver team name")
     pit_stop_count: int = Field(default=0, description="Number of pit stops completed")
     total_pit_time: float = Field(default=0.0, description="Total time spent in pits")
     lap_status: str = Field(..., description="Lap status (valid/invalid/dnf)")
@@ -648,6 +652,8 @@ class ProcessedDataPoint(BaseModel):
                 "track_temperature": 35.2,
                 "humidity": 45.0,
                 "weather_condition": "dry",
+                "track_type": "permanent",
+                "driver_team": "Red Bull Racing",
                 "pit_stop_count": 1,
                 "total_pit_time": 2.8,
                 "lap_status": "valid",
@@ -749,6 +755,122 @@ class DataProcessingResponse(BaseModel):
                     "sector_3_time",
                 ],
                 "created_at": "2024-01-15T10:30:00Z",
+            }
+        }
+    }
+
+
+class CategoricalEncodingRequest(BaseModel):
+    """Request schema for categorical feature encoding."""
+
+    session_key: int = Field(..., description="Session identifier")
+    feature_name: str = Field(..., description="Categorical feature name to encode")
+    encoding_type: str = Field(
+        default="onehot",
+        description="Encoding type (onehot/label)",
+        pattern="^(onehot|label)$",
+    )
+    include_validation: bool = Field(
+        default=True, description="Include validation of encoding consistency"
+    )
+
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "session_key": 9472,
+                "feature_name": "tire_compound",
+                "encoding_type": "onehot",
+                "include_validation": True,
+            }
+        }
+    }
+
+
+class CategoricalMappingResponse(BaseModel):
+    """Response schema for categorical feature mappings."""
+
+    session_key: int = Field(..., description="Session identifier")
+    feature_name: str = Field(..., description="Categorical feature name")
+    encoding_type: str = Field(..., description="Encoding type used")
+    categories: List[str] = Field(..., description="List of unique categories")
+    feature_mappings: Dict[str, Any] = Field(
+        ..., description="Feature mapping dictionary"
+    )
+    encoded_feature_names: List[str] = Field(
+        ..., description="Names of encoded features"
+    )
+    encoding_metadata: Dict[str, Any] = Field(..., description="Encoding metadata")
+    validation_passed: bool = Field(
+        ..., description="Whether encoding validation passed"
+    )
+    created_at: datetime = Field(..., description="Encoding creation timestamp")
+
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "session_key": 9472,
+                "feature_name": "tire_compound",
+                "encoding_type": "onehot",
+                "categories": ["soft", "medium", "hard"],
+                "feature_mappings": {
+                    "tire_compound_soft": [1, 0, 0],
+                    "tire_compound_medium": [0, 1, 0],
+                    "tire_compound_hard": [0, 0, 1],
+                },
+                "encoded_feature_names": [
+                    "tire_compound_soft",
+                    "tire_compound_medium",
+                    "tire_compound_hard",
+                ],
+                "encoding_metadata": {
+                    "feature_count": 3,
+                    "sparse_encoding": False,
+                    "handle_unknown": "ignore",
+                },
+                "validation_passed": True,
+                "created_at": "2024-01-15T10:30:00Z",
+            }
+        }
+    }
+
+
+class EncodingValidationResponse(BaseModel):
+    """Response schema for encoding validation results."""
+
+    session_key: int = Field(..., description="Session identifier")
+    total_features_validated: int = Field(..., description="Total features validated")
+    validation_passed: bool = Field(..., description="Overall validation status")
+    feature_validations: Dict[str, bool] = Field(
+        ..., description="Per-feature validation status"
+    )
+    encoding_consistency: Dict[str, str] = Field(
+        ..., description="Encoding consistency report"
+    )
+    validation_errors: List[str] = Field(..., description="List of validation errors")
+    validation_time_ms: int = Field(..., description="Validation time in milliseconds")
+
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "session_key": 9472,
+                "total_features_validated": 5,
+                "validation_passed": True,
+                "feature_validations": {
+                    "weather_condition": True,
+                    "tire_compound": True,
+                    "track_type": True,
+                    "driver_team": True,
+                    "lap_status": True,
+                },
+                "encoding_consistency": {
+                    "weather_condition": "consistent_onehot_encoding",
+                    "tire_compound": "consistent_onehot_encoding",
+                    "track_type": "consistent_onehot_encoding",
+                    "driver_team": "consistent_onehot_encoding",
+                    "lap_status": "consistent_onehot_encoding",
+                },
+                "validation_errors": [],
+                "validation_time_ms": 45,
             }
         }
     }

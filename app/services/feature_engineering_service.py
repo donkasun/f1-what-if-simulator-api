@@ -168,10 +168,18 @@ class FeatureEngineeringService:
 
         # Define which categorical columns should use one-hot encoding vs label encoding
         # One-hot encoding for high-cardinality categorical features
+        # FWI-BE-106: Enhanced categorical features for weather, tires, track types, and driver teams
         self.onehot_columns = [
             col
             for col in self.categorical_columns
-            if col in ["weather_condition", "tire_compound", "lap_status"]
+            if col
+            in [
+                "weather_condition",  # Weather conditions (dry/wet/intermediate)
+                "tire_compound",  # Tire compounds (soft/medium/hard)
+                "lap_status",  # Lap status (valid/invalid)
+                "track_type",  # Track type (street/permanent/temporary)
+                "driver_team",  # Driver team (Mercedes/Red Bull/Ferrari/etc.)
+            ]
         ]
 
         # Label encoding for low-cardinality or ordinal categorical features

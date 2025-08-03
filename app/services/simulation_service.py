@@ -16,6 +16,7 @@ from async_lru import alru_cache
 from app.core.exceptions import (
     DriverNotFoundError,
     InvalidSimulationParametersError,
+    FeatureEngineeringError,
 )
 from app.external.openf1_client import OpenF1Client
 from app.models.model_loader import ModelLoader
@@ -41,6 +42,9 @@ from app.api.v1.schemas import (
     DataProcessingResponse,
     DataProcessingSummary,
     ProcessedDataPoint,
+    CategoricalEncodingRequest,
+    CategoricalMappingResponse,
+    EncodingValidationResponse,
 )
 
 logger = structlog.get_logger()
@@ -1247,3 +1251,226 @@ class SimulationService:
             "weather_conditions": ["dry", "wet", "intermediate"],
             "tire_usage": {"soft": 0.3, "medium": 0.4, "hard": 0.3},
         }
+
+    # FWI-BE-106: Enhanced Categorical Encoding Methods
+
+    async def encode_categorical_feature(
+        self, request: CategoricalEncodingRequest
+    ) -> CategoricalMappingResponse:
+        """
+        Encode a specific categorical feature with enhanced mapping and validation.
+
+        Args:
+            request: Categorical encoding request
+
+        Returns:
+            Categorical mapping response with detailed encoding information
+        """
+        from datetime import datetime
+
+        logger.info(
+            "Encoding categorical feature",
+            session_key=request.session_key,
+            feature_name=request.feature_name,
+            encoding_type=request.encoding_type,
+        )
+
+        start_time = time.time()
+
+        # Process session data to get the categorical feature
+        data_request = DataProcessingRequest(session_key=request.session_key)
+        processed_response = await self.process_session_data(data_request)
+
+        # Fit the feature engineering pipeline
+        features, targets, metadata = (
+            self.feature_engineering_service.fit_transform_features(
+                processed_response.processed_data, target_column="lap_time"
+            )
+        )
+
+        # Get the specific encoder for the requested feature
+        if request.encoding_type == "onehot":
+            if (
+                request.feature_name
+                not in self.feature_engineering_service.onehot_encoders
+            ):
+                raise FeatureEngineeringError(
+                    f"One-hot encoder not found for feature: {request.feature_name}"
+                )
+            encoder = self.feature_engineering_service.onehot_encoders[
+                request.feature_name
+            ]
+            categories = list(encoder.categories_[0])
+            encoded_feature_names = [
+                f"{request.feature_name}_{cat}" for cat in categories
+            ]
+
+            # Create feature mappings
+            feature_mappings = {}
+            for i, category in enumerate(categories):
+                encoding_vector = [0] * len(categories)
+                encoding_vector[i] = 1
+                feature_mappings[f"{request.feature_name}_{category}"] = encoding_vector
+
+        elif request.encoding_type == "label":
+            if (
+                request.feature_name
+                not in self.feature_engineering_service.label_encoders
+            ):
+                raise FeatureEngineeringError(
+                    f"Label encoder not found for feature: {request.feature_name}"
+                )
+            encoder = self.feature_engineering_service.label_encoders[
+                request.feature_name
+            ]
+            categories = list(encoder.classes_)
+            encoded_feature_names = [request.feature_name]
+
+            # Create feature mappings for label encoding
+            feature_mappings = {
+                category: encoder.transform([category])[0] for category in categories
+            }
+        else:
+            raise FeatureEngineeringError(
+                f"Unsupported encoding type: {request.encoding_type}"
+            )
+
+        # Create encoding metadata
+        encoding_metadata = {
+            "feature_count": len(encoded_feature_names),
+            "sparse_encoding": False,
+            "handle_unknown": "ignore",
+            "encoding_version": "1.0",
+            "encoding_timestamp": datetime.utcnow().isoformat(),
+        }
+
+        # Perform validation if requested
+        validation_passed = True
+        if request.include_validation:
+            try:
+                # Basic validation: check if categories are consistent
+                validation_passed = len(categories) > 0 and all(
+                    isinstance(cat, str) for cat in categories
+                )
+            except Exception:
+                validation_passed = False
+
+        return CategoricalMappingResponse(
+            session_key=request.session_key,
+            feature_name=request.feature_name,
+            encoding_type=request.encoding_type,
+            categories=categories,
+            feature_mappings=feature_mappings,
+            encoded_feature_names=encoded_feature_names,
+            encoding_metadata=encoding_metadata,
+            validation_passed=validation_passed,
+            created_at=datetime.utcnow(),
+        )
+
+    async def validate_categorical_encodings(
+        self, request: DataProcessingRequest
+    ) -> EncodingValidationResponse:
+        """
+        Validate consistency of all categorical encodings for a session.
+
+        Args:
+            request: Data processing request
+
+        Returns:
+            Encoding validation response with detailed validation results
+        """
+        logger.info("Validating categorical encodings", session_key=request.session_key)
+
+        start_time = time.time()
+
+        # Process session data
+        processed_response = await self.process_session_data(request)
+
+        # Fit the feature engineering pipeline
+        features, targets, metadata = (
+            self.feature_engineering_service.fit_transform_features(
+                processed_response.processed_data, target_column="lap_time"
+            )
+        )
+
+        # Define expected categorical features for FWI-BE-106
+        expected_categorical_features = [
+            "weather_condition",
+            "tire_compound",
+            "track_type",
+            "driver_team",
+            "lap_status",
+        ]
+
+        feature_validations = {}
+        encoding_consistency = {}
+        validation_errors = []
+
+        # Validate each categorical feature
+        for feature_name in expected_categorical_features:
+            try:
+                # Check if feature exists in one-hot encoders
+                if feature_name in self.feature_engineering_service.onehot_encoders:
+                    encoder = self.feature_engineering_service.onehot_encoders[
+                        feature_name
+                    ]
+
+                    # Validate encoder state
+                    if (
+                        hasattr(encoder, "categories_")
+                        and len(encoder.categories_[0]) > 0
+                    ):
+                        feature_validations[feature_name] = True
+                        encoding_consistency[feature_name] = (
+                            "consistent_onehot_encoding"
+                        )
+                    else:
+                        feature_validations[feature_name] = False
+                        encoding_consistency[feature_name] = "invalid_onehot_encoding"
+                        validation_errors.append(
+                            f"Invalid one-hot encoder for {feature_name}"
+                        )
+
+                # Check if feature exists in label encoders
+                elif feature_name in self.feature_engineering_service.label_encoders:
+                    encoder = self.feature_engineering_service.label_encoders[
+                        feature_name
+                    ]
+
+                    # Validate encoder state
+                    if hasattr(encoder, "classes_") and len(encoder.classes_) > 0:
+                        feature_validations[feature_name] = True
+                        encoding_consistency[feature_name] = "consistent_label_encoding"
+                    else:
+                        feature_validations[feature_name] = False
+                        encoding_consistency[feature_name] = "invalid_label_encoding"
+                        validation_errors.append(
+                            f"Invalid label encoder for {feature_name}"
+                        )
+                else:
+                    # Feature not found in any encoder
+                    feature_validations[feature_name] = False
+                    encoding_consistency[feature_name] = "missing_encoding"
+                    validation_errors.append(f"No encoder found for {feature_name}")
+
+            except Exception as e:
+                feature_validations[feature_name] = False
+                encoding_consistency[feature_name] = "encoding_error"
+                validation_errors.append(f"Error validating {feature_name}: {str(e)}")
+
+        # Overall validation status
+        validation_passed = (
+            all(feature_validations.values()) and len(validation_errors) == 0
+        )
+
+        processing_time_ms = int((time.time() - start_time) * 1000)
+
+        return EncodingValidationResponse(
+            session_key=request.session_key,
+            total_features_validated=len(expected_categorical_features),
+            validation_passed=validation_passed,
+            feature_validations=feature_validations,
+            encoding_consistency=encoding_consistency,
+            validation_errors=validation_errors,
+            validation_time_ms=processing_time_ms,
+        )

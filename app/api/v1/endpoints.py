@@ -22,6 +22,9 @@ from app.api.v1.schemas import (
     DriverPerformanceSummaryResponse,
     DataProcessingRequest,
     DataProcessingResponse,
+    CategoricalEncodingRequest,
+    CategoricalMappingResponse,
+    EncodingValidationResponse,
 )
 from app.core.exceptions import (
     InvalidSimulationParametersError,
@@ -603,3 +606,219 @@ async def get_encoding_statistics(
             exc_info=True,
         )
         raise HTTPException(status_code=500, detail="Failed to get encoding statistics")
+
+
+# FWI-BE-106: Enhanced Categorical Encoding Endpoints
+
+
+@router.post(
+    "/feature-engineering/categorical/encode", response_model=CategoricalMappingResponse
+)
+async def encode_categorical_feature(
+    request: CategoricalEncodingRequest,
+    simulation_service: SimulationService = Depends(get_simulation_service),
+) -> CategoricalMappingResponse:
+    """Encode a specific categorical feature with enhanced mapping and validation."""
+    logger.info(
+        "Encoding categorical feature",
+        session_key=request.session_key,
+        feature_name=request.feature_name,
+        encoding_type=request.encoding_type,
+    )
+    try:
+        mapping_result = await simulation_service.encode_categorical_feature(request)
+        return mapping_result
+    except FeatureEngineeringError as e:
+        logger.error(
+            "Feature engineering error while encoding categorical feature",
+            session_key=request.session_key,
+            feature_name=request.feature_name,
+            error=str(e),
+        )
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(
+            "Failed to encode categorical feature",
+            session_key=request.session_key,
+            feature_name=request.feature_name,
+            error=str(e),
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=500, detail="Failed to encode categorical feature"
+        )
+
+
+@router.get(
+    "/feature-engineering/categorical/weather-mappings/{session_key}",
+    response_model=dict,
+)
+async def get_weather_condition_mappings(
+    session_key: int,
+    simulation_service: SimulationService = Depends(get_simulation_service),
+) -> dict:
+    """Get weather condition categorical mappings for a session."""
+    logger.info("Getting weather condition mappings", session_key=session_key)
+    try:
+        request = CategoricalEncodingRequest(
+            session_key=session_key,
+            feature_name="weather_condition",
+            encoding_type="onehot",
+        )
+        mapping_result = await simulation_service.encode_categorical_feature(request)
+        return {
+            "session_key": session_key,
+            "feature_name": "weather_condition",
+            "mappings": mapping_result.feature_mappings,
+            "categories": mapping_result.categories,
+            "encoded_features": mapping_result.encoded_feature_names,
+        }
+    except Exception as e:
+        logger.error(
+            "Failed to get weather condition mappings",
+            session_key=session_key,
+            error=str(e),
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=500, detail="Failed to get weather condition mappings"
+        )
+
+
+@router.get(
+    "/feature-engineering/categorical/tire-mappings/{session_key}", response_model=dict
+)
+async def get_tire_compound_mappings(
+    session_key: int,
+    simulation_service: SimulationService = Depends(get_simulation_service),
+) -> dict:
+    """Get tire compound categorical mappings for a session."""
+    logger.info("Getting tire compound mappings", session_key=session_key)
+    try:
+        request = CategoricalEncodingRequest(
+            session_key=session_key,
+            feature_name="tire_compound",
+            encoding_type="onehot",
+        )
+        mapping_result = await simulation_service.encode_categorical_feature(request)
+        return {
+            "session_key": session_key,
+            "feature_name": "tire_compound",
+            "mappings": mapping_result.feature_mappings,
+            "categories": mapping_result.categories,
+            "encoded_features": mapping_result.encoded_feature_names,
+        }
+    except Exception as e:
+        logger.error(
+            "Failed to get tire compound mappings",
+            session_key=session_key,
+            error=str(e),
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=500, detail="Failed to get tire compound mappings"
+        )
+
+
+@router.get(
+    "/feature-engineering/categorical/track-type-mappings/{session_key}",
+    response_model=dict,
+)
+async def get_track_type_mappings(
+    session_key: int,
+    simulation_service: SimulationService = Depends(get_simulation_service),
+) -> dict:
+    """Get track type categorical mappings for a session."""
+    logger.info("Getting track type mappings", session_key=session_key)
+    try:
+        request = CategoricalEncodingRequest(
+            session_key=session_key,
+            feature_name="track_type",
+            encoding_type="onehot",
+        )
+        mapping_result = await simulation_service.encode_categorical_feature(request)
+        return {
+            "session_key": session_key,
+            "feature_name": "track_type",
+            "mappings": mapping_result.feature_mappings,
+            "categories": mapping_result.categories,
+            "encoded_features": mapping_result.encoded_feature_names,
+        }
+    except Exception as e:
+        logger.error(
+            "Failed to get track type mappings",
+            session_key=session_key,
+            error=str(e),
+            exc_info=True,
+        )
+        raise HTTPException(status_code=500, detail="Failed to get track type mappings")
+
+
+@router.get(
+    "/feature-engineering/categorical/driver-team-mappings/{session_key}",
+    response_model=dict,
+)
+async def get_driver_team_mappings(
+    session_key: int,
+    simulation_service: SimulationService = Depends(get_simulation_service),
+) -> dict:
+    """Get driver team categorical mappings for a session."""
+    logger.info("Getting driver team mappings", session_key=session_key)
+    try:
+        request = CategoricalEncodingRequest(
+            session_key=session_key,
+            feature_name="driver_team",
+            encoding_type="onehot",
+        )
+        mapping_result = await simulation_service.encode_categorical_feature(request)
+        return {
+            "session_key": session_key,
+            "feature_name": "driver_team",
+            "mappings": mapping_result.feature_mappings,
+            "categories": mapping_result.categories,
+            "encoded_features": mapping_result.encoded_feature_names,
+        }
+    except Exception as e:
+        logger.error(
+            "Failed to get driver team mappings",
+            session_key=session_key,
+            error=str(e),
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=500, detail="Failed to get driver team mappings"
+        )
+
+
+@router.post(
+    "/feature-engineering/categorical/validate",
+    response_model=EncodingValidationResponse,
+)
+async def validate_categorical_encodings(
+    request: DataProcessingRequest,
+    simulation_service: SimulationService = Depends(get_simulation_service),
+) -> EncodingValidationResponse:
+    """Validate consistency of all categorical encodings for a session."""
+    logger.info("Validating categorical encodings", session_key=request.session_key)
+    try:
+        validation_result = await simulation_service.validate_categorical_encodings(
+            request
+        )
+        return validation_result
+    except FeatureEngineeringError as e:
+        logger.error(
+            "Feature engineering error while validating encodings",
+            session_key=request.session_key,
+            error=str(e),
+        )
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(
+            "Failed to validate categorical encodings",
+            session_key=request.session_key,
+            error=str(e),
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=500, detail="Failed to validate categorical encodings"
+        )
