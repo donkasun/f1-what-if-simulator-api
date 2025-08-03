@@ -181,6 +181,27 @@ class TestSimulationServiceExtended:
             "data_points": 5,
         }
 
+        # Mock driver and track data
+        mock_drivers = [
+            {
+                "driver_number": 1,
+                "full_name": "Max Verstappen",
+                "name_acronym": "VER",
+                "team_name": "Red Bull Racing",
+                "country_code": "NED",
+            }
+        ]
+
+        mock_tracks = [
+            {
+                "track_id": 1,
+                "name": "Monaco",
+                "country": "Monaco",
+                "circuit_length": 3.337,
+                "number_of_laps": 78,
+            }
+        ]
+
         with (
             patch("app.services.simulation_service.OpenF1Client") as mock_client_class,
             patch(
@@ -195,6 +216,8 @@ class TestSimulationServiceExtended:
             mock_client = mock_client_class.return_value
             mock_client.__aenter__ = AsyncMock(return_value=mock_client)
             mock_client.__aexit__ = AsyncMock(return_value=None)
+            mock_client.get_drivers = AsyncMock(return_value=mock_drivers)
+            mock_client.get_tracks = AsyncMock(return_value=mock_tracks)
             mock_client.get_session_weather_summary = AsyncMock(
                 return_value=mock_weather_summary
             )
@@ -218,123 +241,290 @@ class TestSimulationServiceExtended:
     @pytest.mark.asyncio
     async def test_simulation_cache_with_weather_data(self):
         """Test that simulations with weather data are properly cached."""
-        service1 = SimulationService()
-        service2 = SimulationService()
+        # Mock driver and track data
+        mock_drivers = [
+            {
+                "driver_number": 1,
+                "full_name": "Max Verstappen",
+                "name_acronym": "VER",
+                "team_name": "Red Bull Racing",
+                "country_code": "NED",
+            }
+        ]
 
-        request = SimulationRequest(
-            season=2024,
-            driver_id=1,
-            track_id=1,
-            weather_conditions="intermediate",
-            starting_position=5,
-            car_setup={"downforce": "high", "tire_pressure": "medium"},
-        )
+        mock_tracks = [
+            {
+                "track_id": 1,
+                "name": "Monaco",
+                "country": "Monaco",
+                "circuit_length": 3.337,
+                "number_of_laps": 78,
+            }
+        ]
 
-        # Run simulation with service1
-        result1 = await service1.run_simulation(request)
-        simulation_id = result1.simulation_id
+        with (
+            patch("app.services.simulation_service.OpenF1Client") as mock_client_class,
+            patch(
+                "app.services.simulation_service.SimulationService._get_historical_data",
+                new_callable=AsyncMock,
+            ) as mock_get_historical,
+        ):
+            mock_get_historical.return_value = {"data_points": 50}
 
-        # Try to retrieve with service2 (should work with global cache)
-        result2 = await service2.get_simulation_result(simulation_id)
-        assert result2.simulation_id == simulation_id
+            mock_client = mock_client_class.return_value
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=None)
+            mock_client.get_drivers = AsyncMock(return_value=mock_drivers)
+            mock_client.get_tracks = AsyncMock(return_value=mock_tracks)
+
+            service1 = SimulationService()
+            service2 = SimulationService()
+
+            request = SimulationRequest(
+                season=2024,
+                driver_id=1,
+                track_id=1,
+                weather_conditions="intermediate",
+                starting_position=5,
+                car_setup={"downforce": "high", "tire_pressure": "medium"},
+            )
+
+            # Run simulation with service1
+            result1 = await service1.run_simulation(request)
+            simulation_id = result1.simulation_id
+
+            # Try to retrieve with service2 (should work with global cache)
+            result2 = await service2.get_simulation_result(simulation_id)
+            assert result2.simulation_id == simulation_id
 
     @pytest.mark.asyncio
     async def test_simulation_with_complex_car_setup(self):
         """Test simulation with complex car setup data."""
-        service = SimulationService()
-        request = SimulationRequest(
-            season=2024,
-            driver_id=2,
-            track_id=3,
-            weather_conditions="dry",
-            starting_position=10,
-            car_setup={
-                "downforce": "low",
-                "tire_pressure": "high",
-                "suspension": "soft",
-                "brake_bias": "rear",
-                "differential": "open",
-            },
-        )
+        # Mock driver and track data
+        mock_drivers = [
+            {
+                "driver_number": 2,
+                "full_name": "Lewis Hamilton",
+                "name_acronym": "HAM",
+                "team_name": "Mercedes",
+                "country_code": "GBR",
+            }
+        ]
 
-        result = await service.run_simulation(request)
+        mock_tracks = [
+            {
+                "track_id": 3,
+                "name": "Silverstone",
+                "country": "Great Britain",
+                "circuit_length": 5.891,
+                "number_of_laps": 52,
+            }
+        ]
 
-        assert result is not None
-        assert hasattr(result, "simulation_id")
-        assert hasattr(result, "predicted_lap_time")
-        assert hasattr(result, "confidence_score")
-        assert hasattr(result, "car_setup")
+        with (
+            patch("app.services.simulation_service.OpenF1Client") as mock_client_class,
+            patch(
+                "app.services.simulation_service.SimulationService._get_historical_data",
+                new_callable=AsyncMock,
+            ) as mock_get_historical,
+        ):
+            mock_get_historical.return_value = {"data_points": 50}
+
+            mock_client = mock_client_class.return_value
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=None)
+            mock_client.get_drivers = AsyncMock(return_value=mock_drivers)
+            mock_client.get_tracks = AsyncMock(return_value=mock_tracks)
+
+            service = SimulationService()
+            request = SimulationRequest(
+                season=2024,
+                driver_id=2,
+                track_id=3,
+                weather_conditions="dry",
+                starting_position=10,
+                car_setup={
+                    "downforce": "low",
+                    "tire_pressure": "high",
+                    "suspension": "soft",
+                    "brake_bias": "rear",
+                    "differential": "open",
+                },
+            )
+
+            result = await service.run_simulation(request)
+
+            assert result is not None
+            assert hasattr(result, "simulation_id")
+            assert hasattr(result, "predicted_lap_time")
+            assert hasattr(result, "confidence_score")
+            assert hasattr(result, "car_setup")
 
     @pytest.mark.asyncio
     async def test_simulation_error_handling(self):
         """Test simulation error handling."""
-        service = SimulationService()
+        # Mock empty driver data to trigger DriverNotFoundError
+        mock_drivers = []  # Empty list to trigger driver not found
 
-        # Test with invalid driver_id
-        request = SimulationRequest(
-            season=2024,
-            driver_id=999,  # Invalid driver ID
-            track_id=1,
-            weather_conditions="dry",
-            starting_position=1,
-            car_setup={},
-        )
+        mock_tracks = [
+            {
+                "track_id": 1,
+                "name": "Monaco",
+                "country": "Monaco",
+                "circuit_length": 3.337,
+                "number_of_laps": 78,
+            }
+        ]
 
-        # Should raise DriverNotFoundError
-        with pytest.raises(DriverNotFoundError):
-            await service.run_simulation(request)
+        with (
+            patch("app.services.simulation_service.OpenF1Client") as mock_client_class,
+        ):
+            mock_client = mock_client_class.return_value
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=None)
+            mock_client.get_drivers = AsyncMock(return_value=mock_drivers)
+            mock_client.get_tracks = AsyncMock(return_value=mock_tracks)
+
+            service = SimulationService()
+
+            # Test with invalid driver_id
+            request = SimulationRequest(
+                season=2024,
+                driver_id=999,  # Invalid driver ID
+                track_id=1,
+                weather_conditions="dry",
+                starting_position=1,
+                car_setup={},
+            )
+
+            # Should raise DriverNotFoundError
+            with pytest.raises(DriverNotFoundError):
+                await service.run_simulation(request)
 
     @pytest.mark.asyncio
     async def test_cache_stats_with_weather_data(self):
         """Test cache statistics with weather data simulations."""
-        service = SimulationService()
+        # Mock driver and track data
+        mock_drivers = [
+            {
+                "driver_number": 1,
+                "full_name": "Max Verstappen",
+                "name_acronym": "VER",
+                "team_name": "Red Bull Racing",
+                "country_code": "NED",
+            }
+        ]
 
-        # Run multiple simulations with different weather conditions
-        weather_conditions = ["dry", "wet", "intermediate"]
+        mock_tracks = [
+            {
+                "track_id": 1,
+                "name": "Monaco",
+                "country": "Monaco",
+                "circuit_length": 3.337,
+                "number_of_laps": 78,
+            }
+        ]
 
-        for weather in weather_conditions:
-            request = SimulationRequest(
-                season=2024,
-                driver_id=1,
-                track_id=1,
-                weather_conditions=weather,
-                starting_position=1,
-                car_setup={},
-            )
-            await service.run_simulation(request)
+        with (
+            patch("app.services.simulation_service.OpenF1Client") as mock_client_class,
+            patch(
+                "app.services.simulation_service.SimulationService._get_historical_data",
+                new_callable=AsyncMock,
+            ) as mock_get_historical,
+        ):
+            mock_get_historical.return_value = {"data_points": 50}
 
-        # Check cache stats
-        stats = service.get_cache_stats()
-        assert isinstance(stats, dict)
-        assert "cache_size" in stats
-        assert "cached_simulations" in stats
-        assert stats["cache_size"] >= 3
+            mock_client = mock_client_class.return_value
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=None)
+            mock_client.get_drivers = AsyncMock(return_value=mock_drivers)
+            mock_client.get_tracks = AsyncMock(return_value=mock_tracks)
+
+            service = SimulationService()
+
+            # Run multiple simulations with different weather conditions
+            weather_conditions = ["dry", "wet", "intermediate"]
+
+            for weather in weather_conditions:
+                request = SimulationRequest(
+                    season=2024,
+                    driver_id=1,
+                    track_id=1,
+                    weather_conditions=weather,
+                    starting_position=1,
+                    car_setup={"downforce": "medium", "tire_pressure": "medium"},
+                )
+
+                await service.run_simulation(request)
+
+            # Check cache stats
+            stats = service.get_cache_stats()
+            assert "cache_size" in stats
+            assert "cached_simulations" in stats
+            assert "cache_hits" in stats
+            assert "cache_misses" in stats
+            assert stats["cache_size"] >= len(weather_conditions)
 
     @pytest.mark.asyncio
     async def test_simulation_with_different_starting_positions(self):
-        """Test simulations with different starting positions."""
-        service = SimulationService()
+        """Test simulation with different starting positions."""
+        # Mock driver and track data
+        mock_drivers = [
+            {
+                "driver_number": 1,
+                "full_name": "Max Verstappen",
+                "name_acronym": "VER",
+                "team_name": "Red Bull Racing",
+                "country_code": "NED",
+            }
+        ]
 
-        positions = [1, 5, 10, 20]
-        results = []
+        mock_tracks = [
+            {
+                "track_id": 1,
+                "name": "Monaco",
+                "country": "Monaco",
+                "circuit_length": 3.337,
+                "number_of_laps": 78,
+            }
+        ]
 
-        for position in positions:
-            request = SimulationRequest(
-                season=2024,
-                driver_id=1,
-                track_id=1,
-                weather_conditions="dry",
-                starting_position=position,
-                car_setup={},
-            )
-            result = await service.run_simulation(request)
-            results.append(result)
+        with (
+            patch("app.services.simulation_service.OpenF1Client") as mock_client_class,
+            patch(
+                "app.services.simulation_service.SimulationService._get_historical_data",
+                new_callable=AsyncMock,
+            ) as mock_get_historical,
+        ):
+            mock_get_historical.return_value = {"data_points": 50}
 
-        # All simulations should complete successfully
-        assert len(results) == 4
-        for result in results:
-            assert result is not None
-            assert hasattr(result, "simulation_id")
+            mock_client = mock_client_class.return_value
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=None)
+            mock_client.get_drivers = AsyncMock(return_value=mock_drivers)
+            mock_client.get_tracks = AsyncMock(return_value=mock_tracks)
+
+            service = SimulationService()
+
+            # Test different starting positions
+            starting_positions = [1, 5, 10, 20]
+
+            for position in starting_positions:
+                request = SimulationRequest(
+                    season=2024,
+                    driver_id=1,
+                    track_id=1,
+                    weather_conditions="dry",
+                    starting_position=position,
+                    car_setup={"downforce": "medium", "tire_pressure": "medium"},
+                )
+
+                result = await service.run_simulation(request)
+
+                assert result is not None
+                assert hasattr(result, "simulation_id")
+                assert hasattr(result, "predicted_lap_time")
+                assert hasattr(result, "confidence_score")
 
     @pytest.mark.asyncio
     async def test_simulation_result_retrieval_edge_cases(self):
@@ -365,23 +555,65 @@ class TestSimulationServiceExtended:
 
     @pytest.mark.asyncio
     async def test_simulation_with_all_weather_conditions(self):
-        """Test simulations with all weather condition types."""
-        service = SimulationService()
-        weather_conditions = ["dry", "wet", "intermediate"]
+        """Test simulation with all supported weather conditions."""
+        # Mock driver and track data
+        mock_drivers = [
+            {
+                "driver_number": 1,
+                "full_name": "Max Verstappen",
+                "name_acronym": "VER",
+                "team_name": "Red Bull Racing",
+                "country_code": "NED",
+            }
+        ]
 
-        for weather in weather_conditions:
-            request = SimulationRequest(
-                season=2024,
-                driver_id=1,
-                track_id=1,
-                weather_conditions=weather,
-                starting_position=1,
-                car_setup={},
-            )
+        mock_tracks = [
+            {
+                "track_id": 1,
+                "name": "Monaco",
+                "country": "Monaco",
+                "circuit_length": 3.337,
+                "number_of_laps": 78,
+            }
+        ]
 
-            result = await service.run_simulation(request)
-            assert result is not None
-            assert result.weather_conditions == weather
+        with (
+            patch("app.services.simulation_service.OpenF1Client") as mock_client_class,
+            patch(
+                "app.services.simulation_service.SimulationService._get_historical_data",
+                new_callable=AsyncMock,
+            ) as mock_get_historical,
+        ):
+            mock_get_historical.return_value = {"data_points": 50}
+
+            mock_client = mock_client_class.return_value
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=None)
+            mock_client.get_drivers = AsyncMock(return_value=mock_drivers)
+            mock_client.get_tracks = AsyncMock(return_value=mock_tracks)
+
+            service = SimulationService()
+
+            # Test all supported weather conditions
+            weather_conditions = ["dry", "wet", "intermediate"]
+
+            for weather in weather_conditions:
+                request = SimulationRequest(
+                    season=2024,
+                    driver_id=1,
+                    track_id=1,
+                    weather_conditions=weather,
+                    starting_position=1,
+                    car_setup={"downforce": "medium", "tire_pressure": "medium"},
+                )
+
+                result = await service.run_simulation(request)
+
+                assert result is not None
+                assert hasattr(result, "simulation_id")
+                assert hasattr(result, "predicted_lap_time")
+                assert hasattr(result, "confidence_score")
+                assert result.weather_conditions == weather
 
 
 class TestSimulationServiceStartingGrid:

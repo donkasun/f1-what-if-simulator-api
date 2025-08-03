@@ -106,6 +106,13 @@ class TestFeatureEngineeringService:
         assert "driver_id" in df.columns
         assert "tire_compound" in df.columns
 
+    def test_convert_to_dataframe_empty_data(self):
+        """Test conversion with empty data points."""
+        service = FeatureEngineeringService()
+
+        with pytest.raises(FeatureEngineeringError, match="No data points provided"):
+            service._convert_to_dataframe([])
+
     def test_define_columns(self):
         """Test column definition."""
         df = self.service._convert_to_dataframe(self.sample_data_points)
@@ -232,6 +239,46 @@ class TestFeatureEngineeringService:
         assert isinstance(targets, np.ndarray)
         assert len(features) == len(targets)
         assert "lap_time" in self.service.feature_selectors
+
+    def test_select_features_target_not_found(self):
+        """Test feature selection when target column is not found."""
+        service = FeatureEngineeringService()
+
+        # Create test data without the target column
+        data_points = [
+            ProcessedDataPoint(
+                timestamp=datetime.now(UTC),
+                driver_id=1,
+                lap_number=1,
+                lap_time=85.0,
+                sector_1_time=28.0,
+                sector_2_time=29.0,
+                sector_3_time=28.0,
+                tire_compound="soft",
+                fuel_load=100.0,
+                grid_position=1,
+                current_position=1,
+                air_temperature=25.0,
+                track_temperature=35.0,
+                humidity=60.0,
+                weather_condition="dry",
+                track_type="permanent",
+                driver_team="Red Bull Racing",
+                pit_stop_count=0,
+                total_pit_time=0.0,
+                lap_status="valid",
+            )
+        ]
+
+        # Fit the service first
+        service.fit_transform_features(data_points, target_column="lap_time")
+
+        # Try to select features with a non-existent target column
+        df = service._convert_to_dataframe(data_points)
+        with pytest.raises(
+            FeatureEngineeringError, match="Target column nonexistent not found in data"
+        ):
+            service._select_features(df, "nonexistent")
 
     def test_fit_transform_features(self):
         """Test complete fit_transform pipeline."""
@@ -714,3 +761,217 @@ class TestFeatureEngineeringService:
             "feature_importance_scores" not in metadata
             or metadata["feature_importance_scores"] == {}
         )
+
+    def test_prepare_metadata_with_feature_importance(self):
+        """Test metadata preparation with feature importance scores."""
+        service = FeatureEngineeringService()
+
+        # Create test data and fit the service
+        data_points = [
+            ProcessedDataPoint(
+                timestamp=datetime.now(UTC),
+                driver_id=1,
+                lap_number=1,
+                lap_time=85.0,
+                sector_1_time=28.0,
+                sector_2_time=29.0,
+                sector_3_time=28.0,
+                tire_compound="soft",
+                fuel_load=100.0,
+                grid_position=1,
+                current_position=1,
+                air_temperature=25.0,
+                track_temperature=35.0,
+                humidity=60.0,
+                weather_condition="dry",
+                track_type="permanent",
+                driver_team="Red Bull Racing",
+                pit_stop_count=0,
+                total_pit_time=0.0,
+                lap_status="valid",
+            )
+        ]
+
+        # Fit the service
+        service.fit_transform_features(data_points, target_column="lap_time")
+
+        # Prepare metadata
+        df = service._convert_to_dataframe(data_points)
+        metadata = service._prepare_metadata(df, "lap_time")
+
+        # Check that feature importance scores are included
+        assert "feature_importance_scores" in metadata
+        assert isinstance(metadata["feature_importance_scores"], dict)
+        assert len(metadata["feature_importance_scores"]) > 0
+
+    def test_handle_missing_values_target_column(self):
+        """Test handling missing values in target column."""
+        service = FeatureEngineeringService()
+
+        # Create test data with missing values in target column
+        data_points = [
+            ProcessedDataPoint(
+                timestamp=datetime.now(UTC),
+                driver_id=1,
+                lap_number=1,
+                lap_time=85.0,  # Valid lap time
+                sector_1_time=28.0,
+                sector_2_time=29.0,
+                sector_3_time=28.0,
+                tire_compound="soft",
+                fuel_load=100.0,
+                grid_position=1,
+                current_position=1,
+                air_temperature=25.0,
+                track_temperature=35.0,
+                humidity=60.0,
+                weather_condition="dry",
+                track_type="permanent",
+                driver_team="Red Bull Racing",
+                pit_stop_count=0,
+                total_pit_time=0.0,
+                lap_status="valid",
+            ),
+            ProcessedDataPoint(
+                timestamp=datetime.now(UTC),
+                driver_id=1,
+                lap_number=2,
+                lap_time=None,  # Missing lap time
+                sector_1_time=28.0,
+                sector_2_time=29.0,
+                sector_3_time=28.0,
+                tire_compound="soft",
+                fuel_load=100.0,
+                grid_position=1,
+                current_position=1,
+                air_temperature=25.0,
+                track_temperature=35.0,
+                humidity=60.0,
+                weather_condition="dry",
+                track_type="permanent",
+                driver_team="Red Bull Racing",
+                pit_stop_count=0,
+                total_pit_time=0.0,
+                lap_status="valid",
+            ),
+        ]
+
+        # Convert to DataFrame and define columns
+        df = service._convert_to_dataframe(data_points)
+        service._define_columns(df, "lap_time")
+
+        # Handle missing values
+        result = service._handle_missing_values(df)
+
+        # Check that missing values were imputed
+        assert not result["lap_time"].isnull().any()
+        assert "lap_time" in service.imputers
+
+    def test_select_features_transform_no_selectors(self):
+        """Test feature selection transform when no selectors are fitted."""
+        service = FeatureEngineeringService()
+
+        # Create test data
+        data_points = [
+            ProcessedDataPoint(
+                timestamp=datetime.now(UTC),
+                driver_id=1,
+                lap_number=1,
+                lap_time=85.0,
+                sector_1_time=28.0,
+                sector_2_time=29.0,
+                sector_3_time=28.0,
+                tire_compound="soft",
+                fuel_load=100.0,
+                grid_position=1,
+                current_position=1,
+                air_temperature=25.0,
+                track_temperature=35.0,
+                humidity=60.0,
+                weather_condition="dry",
+                track_type="permanent",
+                driver_team="Red Bull Racing",
+                pit_stop_count=0,
+                total_pit_time=0.0,
+                lap_status="valid",
+            )
+        ]
+
+        # Convert to DataFrame and define columns
+        df = service._convert_to_dataframe(data_points)
+        service._define_columns(df, "lap_time")
+
+        # Handle missing values and encode categorical features
+        df = service._handle_missing_values(df)
+        df = service._create_engineered_features(df)
+        df = service._encode_categorical_features(df)
+        df = service._scale_numerical_features(df)
+
+        # Test transform without fitted selectors
+        result = service._select_features_transform(df)
+        assert isinstance(result, np.ndarray)
+        assert result.dtype == np.float64
+
+    def test_handle_missing_values_mean_imputation(self):
+        """Test handling missing values with mean imputation for non-lap-time columns."""
+        service = FeatureEngineeringService()
+
+        # Create test data with missing values in non-lap-time numerical columns
+        data_points = [
+            ProcessedDataPoint(
+                timestamp=datetime.now(UTC),
+                driver_id=1,
+                lap_number=1,
+                lap_time=85.0,
+                sector_1_time=28.0,
+                sector_2_time=29.0,
+                sector_3_time=28.0,
+                tire_compound="soft",
+                fuel_load=100.0,
+                grid_position=1,
+                current_position=1,
+                air_temperature=25.0,  # Valid temperature
+                track_temperature=35.0,
+                humidity=60.0,
+                weather_condition="dry",
+                track_type="permanent",
+                driver_team="Red Bull Racing",
+                pit_stop_count=0,
+                total_pit_time=0.0,
+                lap_status="valid",
+            ),
+            ProcessedDataPoint(
+                timestamp=datetime.now(UTC),
+                driver_id=1,
+                lap_number=2,
+                lap_time=86.0,
+                sector_1_time=28.5,
+                sector_2_time=29.5,
+                sector_3_time=28.0,
+                tire_compound="soft",
+                fuel_load=100.0,
+                grid_position=1,
+                current_position=1,
+                air_temperature=None,  # Missing temperature - should use mean imputation
+                track_temperature=35.0,
+                humidity=60.0,
+                weather_condition="dry",
+                track_type="permanent",
+                driver_team="Red Bull Racing",
+                pit_stop_count=0,
+                total_pit_time=0.0,
+                lap_status="valid",
+            ),
+        ]
+
+        # Convert to DataFrame and define columns
+        df = service._convert_to_dataframe(data_points)
+        service._define_columns(df, "lap_time")
+
+        # Handle missing values
+        result = service._handle_missing_values(df)
+
+        # Check that missing values were imputed with mean strategy
+        assert not result["air_temperature"].isnull().any()
+        assert "air_temperature" in service.imputers
+        assert service.imputers["air_temperature"].strategy == "mean"
