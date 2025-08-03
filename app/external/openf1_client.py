@@ -221,6 +221,8 @@ class OpenF1Client:
 
             if self._client is None:
                 raise OpenF1APIError("HTTP client not initialized")
+
+            time.sleep(1)  # Add a delay to avoid rate limiting
             response = await self._client.request(method, url, params=params)
             response_time_ms = int((time.time() - start_time) * 1000)
 
